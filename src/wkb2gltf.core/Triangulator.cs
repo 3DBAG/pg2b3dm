@@ -6,7 +6,7 @@ namespace Wkb2Gltf
 {
     public static class Triangulator
     {
-        public static List<Triangle> GetTriangles(PolyhedralSurface polyhedralsurface, string[] hexColors, int batchId)
+        public static List<Triangle> GetTriangles(MultiPolygon polyhedralsurface, string[] hexColors, int batchId)
         {
             var degenerated_triangles = 0;
             var allTriangles = new List<Triangle>();

@@ -22,7 +22,7 @@ namespace Wkb2Gltf
 
         public List<Triangle> GetTriangles()
         {
-            var surface = (PolyhedralSurface)Geometry;
+            var surface = (MultiPolygon)Geometry;
             var colors = HexColors;
             var triangles = Triangulator.GetTriangles(surface, colors, BatchId);
             return triangles;

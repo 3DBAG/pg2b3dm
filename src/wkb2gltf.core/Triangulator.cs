@@ -25,7 +25,15 @@ namespace Wkb2Gltf
                     }
                 }
                 else {
-                    triangle = GetTriangle(geometry, batchId, String.Empty);
+                    try
+                    {
+                        triangle = GetTriangle(geometry, batchId, String.Empty);
+                    }
+                    catch (Exception exp)
+                    {
+                        Console.WriteLine($"Triangle skipped: {exp.Message}!");
+                        continue;
+                    }
                 }
 
                 if (triangle != null) {

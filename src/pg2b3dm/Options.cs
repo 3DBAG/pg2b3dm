@@ -36,5 +36,8 @@ namespace pg2b3dm
 
         [Option("refine", Required = false, Default = "REPLACE", HelpText = "Refinement method (ADD/REPLACE)")]
         public string Refinement { get; set; }
+
+        [Option("skiptiles", Default = false, HelpText = "Skip creation of existing tiles")]
+        public bool SkipTiles { get; set; }
     }
 }

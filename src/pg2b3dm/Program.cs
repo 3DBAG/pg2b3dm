@@ -137,25 +137,21 @@ namespace pg2b3dm
         {
             object counterLock = new object();
 
-            Parallel.ForEach(tiles,
+            Parallel.For(0, tiles.Count,
             () => {
                 var new_conn = new NpgsqlConnection(connectionString);
                 var pb = new Konsole.ProgressBar(Konsole.PbStyle.SingleLine, maxcount);
+                pb.Refresh(counter, "New thread");
                 return (new_conn, pb);
             },
-            (Tile t, ParallelLoopState state, (NpgsqlConnection new_conn, Konsole.ProgressBar pb) t1) => {
-                int c;
-                lock(counterLock)
-                {
-                    c = counter;
-                    counter++;
-                }
+            (int c, ParallelLoopState state, (NpgsqlConnection new_conn, Konsole.ProgressBar pb) t1) => {
+                var t = tiles[c];
                 // var perc = Math.Round(((double)c / maxcount) * 100, 2);
                 // Console.Write($"\rcreating tiles: {c}/{maxcount} - {perc:F}%");
                 var new_conn = t1.new_conn;
-                t1.pb.Refresh(counter, "Thread");
+                t1.pb.Refresh(c, $"Doing {c}/{maxcount}");
 
-                var filename = $"{outputPath}/tiles/{counter}.b3dm";
+                var filename = $"{outputPath}/tiles/{c + 1}.b3dm";
                 if (SkipTiles && File.Exists(filename))
                 {
                     return t1;
@@ -163,11 +159,15 @@ namespace pg2b3dm
 
                 var geometries = BoundingBoxRepository.GetGeometrySubset(new_conn, geometryTable, geometryColumn, idcolumn, translation, t, epsg, colorColumn, attributesColumn, lodColumn);
 
+                t1.pb.Refresh(c, $"Building {c}/{maxcount}");
+
                 var triangleCollection = GetTriangles(geometries);
 
                 var attributes = GetAttributes(geometries);
 
                 var b3dm = B3dmCreator.GetB3dm(attributesColumn, attributes, triangleCollection);
+
+                t1.pb.Refresh(c, $"Writing {c}/{maxcount}");
 
                 B3dmWriter.WriteB3dm(filename, b3dm);
 

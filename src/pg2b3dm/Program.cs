@@ -28,7 +28,7 @@ namespace pg2b3dm
                 o.User = string.IsNullOrEmpty(o.User) ? Environment.UserName : o.User;
                 o.Database = string.IsNullOrEmpty(o.Database) ? Environment.UserName : o.Database;
 
-                var connectionString = $"Host={o.Host};Username={o.User};Database={o.Database};Port={o.Port}";
+                var connectionString = $"Host={o.Host};Username={o.User};Database={o.Database};Port={o.Port};Pooling=True";
                 var istrusted = TrustedConnectionChecker.HasTrustedConnection(connectionString);
 
                 if (!istrusted) {
@@ -101,7 +101,7 @@ namespace pg2b3dm
                 var json = TreeSerializer.ToJson(tiles.tiles, translation, box, geometricErrors[0], o.Refinement);
                 File.WriteAllText($"{o.Output}/tileset.json", json);
 
-                WriteTiles(conn, geometryTable, geometryColumn, idcolumn, translation, tiles.tiles, sr, o.Output, 0, nrOfTiles, o.RoofColorColumn, o.AttributesColumn, o.LodColumn, o.SkipTiles);
+                WriteTiles(connectionString, geometryTable, geometryColumn, idcolumn, translation, tiles.tiles, sr, o.Output, 0, nrOfTiles, o.RoofColorColumn, o.AttributesColumn, o.LodColumn, o.SkipTiles);
 
                 stopWatch.Stop();
                 Console.WriteLine();
@@ -132,12 +132,13 @@ namespace pg2b3dm
             }
         }
 
-        private static int WriteTiles(NpgsqlConnection conn, string geometryTable, string geometryColumn, string idcolumn, double[] translation, List<Tile> tiles, int epsg, string outputPath, int counter, int maxcount, string colorColumn = "", string attributesColumn = "", string lodColumn="", bool SkipTiles=false)
+        private static int WriteTiles(string connectionString, string geometryTable, string geometryColumn, string idcolumn, double[] translation, List<Tile> tiles, int epsg, string outputPath, int counter, int maxcount, string colorColumn = "", string attributesColumn = "", string lodColumn="", bool SkipTiles=false)
         {
             object counterLock = new object();
+
             Parallel.ForEach(tiles,
             () => {
-                var new_conn = conn.CloneWith(conn.ConnectionString);
+                var new_conn = new NpgsqlConnection(connectionString);
                 return new_conn;
             },
             (Tile t, ParallelLoopState state, NpgsqlConnection new_conn) => {
@@ -149,8 +150,6 @@ namespace pg2b3dm
                 }
                 var perc = Math.Round(((double)c / maxcount) * 100, 2);
                 Console.Write($"\rcreating tiles: {c}/{maxcount} - {perc:F}%");
-
-                Console.WriteLine(new_conn.State);
 
                 var filename = $"{outputPath}/tiles/{counter}.b3dm";
                 if (SkipTiles && File.Exists(filename))
@@ -169,10 +168,10 @@ namespace pg2b3dm
                 B3dmWriter.WriteB3dm(filename, b3dm);
 
                 if (t.Children != null) {
-                    c = WriteTiles(conn, geometryTable, geometryColumn, idcolumn, translation, t.Children, epsg, outputPath, counter, maxcount, colorColumn, attributesColumn, lodColumn, SkipTiles);
+                    c = WriteTiles(connectionString, geometryTable, geometryColumn, idcolumn, translation, t.Children, epsg, outputPath, counter, maxcount, colorColumn, attributesColumn, lodColumn, SkipTiles);
                 }
 
-                return new_conn; 
+                return new_conn;
             },
             (NpgsqlConnection new_conn) => {
                 new_conn.Close();

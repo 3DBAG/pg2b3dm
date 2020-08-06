@@ -137,7 +137,6 @@ namespace pg2b3dm
             object counterLock = new object();
             Parallel.ForEach(tiles,
             () => {
-                Console.WriteLine("Starting thread...");
                 var new_conn = conn.CloneWith(conn.ConnectionString);
                 return new_conn;
             },
@@ -148,6 +147,8 @@ namespace pg2b3dm
                     c = counter;
                     counter++;
                 }
+                var perc = Math.Round(((double)c / maxcount) * 100, 2);
+                Console.Write($"\rcreating tiles: {c}/{maxcount} - {perc:F}%");
 
                 Console.WriteLine(new_conn.State);
 
@@ -156,8 +157,6 @@ namespace pg2b3dm
                 {
                     return new_conn;
                 }
-                var perc = Math.Round(((double)c / maxcount) * 100, 2);
-                Console.Write($"\rcreating tiles: {c}/{maxcount} - {perc:F}%");
 
                 var geometries = BoundingBoxRepository.GetGeometrySubset(new_conn, geometryTable, geometryColumn, idcolumn, translation, t, epsg, colorColumn, attributesColumn, lodColumn);
 
@@ -177,7 +176,6 @@ namespace pg2b3dm
             },
             (NpgsqlConnection new_conn) => {
                 new_conn.Close();
-                Console.WriteLine("Closing thread...");
             });
             Console.WriteLine("Aaaand... done!");
             return counter;

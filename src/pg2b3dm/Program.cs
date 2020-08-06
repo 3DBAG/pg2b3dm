@@ -10,6 +10,7 @@ using CommandLine;
 using Npgsql;
 using Wkb2Gltf;
 using System.Threading.Tasks;
+using Konsole.Internal;
 
 namespace pg2b3dm
 {
@@ -139,22 +140,25 @@ namespace pg2b3dm
             Parallel.ForEach(tiles,
             () => {
                 var new_conn = new NpgsqlConnection(connectionString);
-                return new_conn;
+                var pb = new Konsole.ProgressBar(Konsole.PbStyle.SingleLine, maxcount);
+                return (new_conn, pb);
             },
-            (Tile t, ParallelLoopState state, NpgsqlConnection new_conn) => {
+            (Tile t, ParallelLoopState state, (NpgsqlConnection new_conn, Konsole.ProgressBar pb) t1) => {
                 int c;
                 lock(counterLock)
                 {
                     c = counter;
                     counter++;
                 }
-                var perc = Math.Round(((double)c / maxcount) * 100, 2);
-                Console.Write($"\rcreating tiles: {c}/{maxcount} - {perc:F}%");
+                // var perc = Math.Round(((double)c / maxcount) * 100, 2);
+                // Console.Write($"\rcreating tiles: {c}/{maxcount} - {perc:F}%");
+                var new_conn = t1.new_conn;
+                t1.pb.Refresh(counter, "Thread");
 
                 var filename = $"{outputPath}/tiles/{counter}.b3dm";
                 if (SkipTiles && File.Exists(filename))
                 {
-                    return new_conn;
+                    return t1;
                 }
 
                 var geometries = BoundingBoxRepository.GetGeometrySubset(new_conn, geometryTable, geometryColumn, idcolumn, translation, t, epsg, colorColumn, attributesColumn, lodColumn);
@@ -171,11 +175,12 @@ namespace pg2b3dm
                     c = WriteTiles(connectionString, geometryTable, geometryColumn, idcolumn, translation, t.Children, epsg, outputPath, counter, maxcount, colorColumn, attributesColumn, lodColumn, SkipTiles);
                 }
 
-                return new_conn;
+                return t1;
             },
-            (NpgsqlConnection new_conn) => {
-                new_conn.Close();
-            });
+            ((NpgsqlConnection new_conn, Konsole.ProgressBar progressBar) t1) => {
+                t1.new_conn.Close();
+                t1.progressBar.Refresh(maxcount, "Done!");
+            }); 
             Console.WriteLine("Aaaand... done!");
             return counter;
         }

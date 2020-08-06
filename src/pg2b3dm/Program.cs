@@ -102,7 +102,7 @@ namespace pg2b3dm
                 var json = TreeSerializer.ToJson(tiles.tiles, translation, box, geometricErrors[0], o.Refinement);
                 File.WriteAllText($"{o.Output}/tileset.json", json);
 
-                WriteTiles(connectionString, geometryTable, geometryColumn, idcolumn, translation, tiles.tiles, sr, o.Output, 0, nrOfTiles, o.RoofColorColumn, o.AttributesColumn, o.LodColumn, o.SkipTiles);
+                WriteTiles(connectionString, geometryTable, geometryColumn, idcolumn, translation, tiles.tiles, sr, o.Output, 0, nrOfTiles, o.RoofColorColumn, o.AttributesColumn, o.LodColumn, o.SkipTiles, o.MaxThreads);
 
                 stopWatch.Stop();
                 Console.WriteLine();
@@ -133,15 +133,18 @@ namespace pg2b3dm
             }
         }
 
-        private static int WriteTiles(string connectionString, string geometryTable, string geometryColumn, string idcolumn, double[] translation, List<Tile> tiles, int epsg, string outputPath, int counter, int maxcount, string colorColumn = "", string attributesColumn = "", string lodColumn="", bool SkipTiles=false)
+        private static int WriteTiles(string connectionString, string geometryTable, string geometryColumn, string idcolumn, double[] translation, List<Tile> tiles, int epsg, string outputPath, int counter, int maxcount, string colorColumn = "", string attributesColumn = "", string lodColumn="", bool SkipTiles=false, int MaxThreads=-1)
         {
-            object counterLock = new object();
+            var options = new ParallelOptions();
+            options.MaxDegreeOfParallelism = MaxThreads;
 
             Parallel.For(0, tiles.Count,
+            options,
             () => {
                 var new_conn = new NpgsqlConnection(connectionString);
                 var pb = new Konsole.ProgressBar(Konsole.PbStyle.SingleLine, maxcount);
                 pb.Refresh(counter, "New thread");
+
                 return (new_conn, pb);
             },
             (int c, ParallelLoopState state, (NpgsqlConnection new_conn, Konsole.ProgressBar pb) t1) => {

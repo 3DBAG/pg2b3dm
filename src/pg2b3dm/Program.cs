@@ -135,34 +135,38 @@ namespace pg2b3dm
 
         private static int WriteTiles(string connectionString, string geometryTable, string geometryColumn, string idcolumn, double[] translation, List<Tile> tiles, int epsg, string outputPath, int counter, int maxcount, string colorColumn = "", string attributesColumn = "", string lodColumn="", bool SkipTiles=false, int MaxThreads=-1)
         {
+            object counterLock = new object();
+            counter = 0;    
+
             var options = new ParallelOptions();
             options.MaxDegreeOfParallelism = MaxThreads;
+
+            var pb = new Konsole.ProgressBar(Konsole.PbStyle.SingleLine, maxcount);
+            pb.Refresh(counter, "Starting...");
 
             Parallel.For(0, tiles.Count,
             options,
             () => {
                 var new_conn = new NpgsqlConnection(connectionString);
-                var pb = new Konsole.ProgressBar(Konsole.PbStyle.SingleLine, maxcount);
-                pb.Refresh(counter, "New thread");
 
-                return (new_conn, pb);
+                return new_conn;
             },
-            (int c, ParallelLoopState state, (NpgsqlConnection new_conn, Konsole.ProgressBar pb) t1) => {
+            (int c, ParallelLoopState state, NpgsqlConnection new_conn) => {
                 var t = tiles[c];
-                // var perc = Math.Round(((double)c / maxcount) * 100, 2);
-                // Console.Write($"\rcreating tiles: {c}/{maxcount} - {perc:F}%");
-                var new_conn = t1.new_conn;
-                t1.pb.Refresh(c, $"Doing {c}/{maxcount}");
+                lock (counterLock)
+                {
+                    counter++;
+                    var perc = Math.Round(((double)counter / maxcount) * 100, 2);
+                    pb.Refresh(counter, $"{counter}/{maxcount} - {perc:F}%");
+                }
 
                 var filename = $"{outputPath}/tiles/{c + 1}.b3dm";
                 if (SkipTiles && File.Exists(filename))
                 {
-                    return t1;
+                    return new_conn;
                 }
 
                 var geometries = BoundingBoxRepository.GetGeometrySubset(new_conn, geometryTable, geometryColumn, idcolumn, translation, t, epsg, colorColumn, attributesColumn, lodColumn);
-
-                t1.pb.Refresh(c, $"Building {c}/{maxcount}");
 
                 var triangleCollection = GetTriangles(geometries);
 
@@ -170,19 +174,16 @@ namespace pg2b3dm
 
                 var b3dm = B3dmCreator.GetB3dm(attributesColumn, attributes, triangleCollection);
 
-                t1.pb.Refresh(c, $"Writing {c}/{maxcount}");
-
                 B3dmWriter.WriteB3dm(filename, b3dm);
 
                 if (t.Children != null) {
-                    c = WriteTiles(connectionString, geometryTable, geometryColumn, idcolumn, translation, t.Children, epsg, outputPath, counter, maxcount, colorColumn, attributesColumn, lodColumn, SkipTiles);
+                    counter = WriteTiles(connectionString, geometryTable, geometryColumn, idcolumn, translation, t.Children, epsg, outputPath, counter, maxcount, colorColumn, attributesColumn, lodColumn, SkipTiles);
                 }
 
-                return t1;
+                return new_conn;
             },
-            ((NpgsqlConnection new_conn, Konsole.ProgressBar progressBar) t1) => {
-                t1.new_conn.Close();
-                t1.progressBar.Refresh(maxcount, "Done!");
+            (NpgsqlConnection new_conn) => {
+                new_conn.Close();
             }); 
             Console.WriteLine("Aaaand... done!");
             return counter;

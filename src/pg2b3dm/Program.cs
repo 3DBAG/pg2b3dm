@@ -9,12 +9,15 @@ using B3dm.Tileset;
 using CommandLine;
 using Npgsql;
 using Wkb2Gltf;
+using System.Threading.Tasks;
 
 namespace pg2b3dm
 {
     class Program
     {
         static string password = string.Empty;
+
+        static object tilesLock = new Object();
 
         static void Main(string[] args)
         {
@@ -131,18 +134,32 @@ namespace pg2b3dm
 
         private static int WriteTiles(NpgsqlConnection conn, string geometryTable, string geometryColumn, string idcolumn, double[] translation, List<Tile> tiles, int epsg, string outputPath, int counter, int maxcount, string colorColumn = "", string attributesColumn = "", string lodColumn="", bool SkipTiles=false)
         {
-            foreach (var t in tiles) {
-                counter++;
+            object counterLock = new object();
+            Parallel.ForEach(tiles,
+            () => {
+                Console.WriteLine("Starting thread...");
+                var new_conn = conn.CloneWith(conn.ConnectionString);
+                return new_conn;
+            },
+            (Tile t, ParallelLoopState state, NpgsqlConnection new_conn) => {
+                int c;
+                lock(counterLock)
+                {
+                    c = counter;
+                    counter++;
+                }
+
+                Console.WriteLine(new_conn.State);
 
                 var filename = $"{outputPath}/tiles/{counter}.b3dm";
                 if (SkipTiles && File.Exists(filename))
                 {
-                    continue;
+                    return new_conn;
                 }
-                var perc = Math.Round(((double)counter / maxcount) * 100, 2);
-                Console.Write($"\rcreating tiles: {counter}/{maxcount} - {perc:F}%");
+                var perc = Math.Round(((double)c / maxcount) * 100, 2);
+                Console.Write($"\rcreating tiles: {c}/{maxcount} - {perc:F}%");
 
-                var geometries = BoundingBoxRepository.GetGeometrySubset(conn, geometryTable, geometryColumn, idcolumn, translation, t, epsg, colorColumn, attributesColumn, lodColumn);
+                var geometries = BoundingBoxRepository.GetGeometrySubset(new_conn, geometryTable, geometryColumn, idcolumn, translation, t, epsg, colorColumn, attributesColumn, lodColumn);
 
                 var triangleCollection = GetTriangles(geometries);
 
@@ -153,10 +170,16 @@ namespace pg2b3dm
                 B3dmWriter.WriteB3dm(filename, b3dm);
 
                 if (t.Children != null) {
-                    counter = WriteTiles(conn, geometryTable, geometryColumn, idcolumn, translation, t.Children, epsg, outputPath, counter, maxcount, colorColumn, attributesColumn, lodColumn, SkipTiles);
+                    c = WriteTiles(conn, geometryTable, geometryColumn, idcolumn, translation, t.Children, epsg, outputPath, counter, maxcount, colorColumn, attributesColumn, lodColumn, SkipTiles);
                 }
 
-            }
+                return new_conn; 
+            },
+            (NpgsqlConnection new_conn) => {
+                new_conn.Close();
+                Console.WriteLine("Closing thread...");
+            });
+            Console.WriteLine("Aaaand... done!");
             return counter;
         }
 

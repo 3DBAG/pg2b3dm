@@ -61,11 +61,14 @@ namespace B3dm.Tileset
         public static Child GetChild(Tile tile)
         {
             var child = new Child {
-                geometricError = tile.GeometricError,
-                content = new Content()
+                geometricError = tile.GeometricError
             };
-            child.content.uri = $"tiles/{tile.Id}.b3dm";
             child.boundingVolume = tile.Boundingvolume;
+            // Tile IDs of nodes are 0
+            if ( tile.Id != 0 ) {
+                child.content = new Content();
+                child.content.uri = $"tiles/{tile.Id}.b3dm";
+            }
             return child;
         }
     }

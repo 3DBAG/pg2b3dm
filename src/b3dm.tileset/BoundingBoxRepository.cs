@@ -41,6 +41,26 @@ namespace B3dm.Tileset
             return new BoundingBox3D() { XMin = xmin, YMin = ymin, ZMin = zmin, XMax = xmax, YMax = ymax, ZMax = zmax };
         }
 
+        public static BoundingBox3D GetBoundingBox3DForQT(NpgsqlConnection conn) {
+
+            conn.Open();
+            var sql = "SELECT ST_AsBinary(geom) FROM quadtree_full WHERE z=0";
+            var cmd = new NpgsqlCommand(sql, conn);
+            var reader = cmd.ExecuteReader();
+            reader.Read();
+
+            var geom_stream = reader.GetStream(0);
+            var geom = Geometry.Deserialize<WkbSerializer>(geom_stream);
+            var bbox = geom.GetBoundingBox();
+
+            reader.Close();
+            conn.Close();
+
+            // Quadtree root doesn't have heights
+            return new BoundingBox3D() { XMin = bbox.XMin, YMin = bbox.YMin, ZMin = 0, XMax = bbox.XMax, YMax = bbox.YMax, ZMax = 0 };
+
+        }
+
         private static string GetGeometryColumn(string geometry_column, double[] translation)
         {
             return $"ST_RotateX(ST_Translate({ geometry_column}, { translation[0].ToString(CultureInfo.InvariantCulture)}*-1,{ translation[1].ToString(CultureInfo.InvariantCulture)}*-1 , { translation[2].ToString(CultureInfo.InvariantCulture)}*-1), -pi() / 2)";
@@ -61,7 +81,7 @@ namespace B3dm.Tileset
             var sqlFrom = "FROM " + geometry_table;
 
             var lodQuery = LodQuery.GetLodQuery(lodColumn, t.Lod);
-            var sqlWhere = $" WHERE ST_Intersects(ST_Centroid(ST_Envelope({ geometry_column})), ST_MakeEnvelope({ t.BoundingBox.XMin}, { t.BoundingBox.YMin}, { t.BoundingBox.XMax}, { t.BoundingBox.YMax}, { epsg})) { lodQuery}";
+            var sqlWhere = $" WHERE ST_3DIntersects({ geometry_column}, ST_MakeEnvelope({ t.BoundingBox.XMin}, { t.BoundingBox.YMin}, { t.BoundingBox.XMax}, { t.BoundingBox.YMax}, { epsg})) { lodQuery}";
 
             var sql = sqlselect + sqlFrom + sqlWhere;
 

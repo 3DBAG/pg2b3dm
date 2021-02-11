@@ -70,7 +70,10 @@ namespace B3dm.Tileset
 
             } else {
 
-                var used_nodes = new List<SortedSet<int>>();
+                var used_nodes_indices = new List<Dictionary<String, (String, Tile)>>();
+                var used_nodes = new List<Dictionary<String, (String, Tile)>>();
+
+                var leaf_tiles = new Dictionary<String, (String, Tile)>();
 
                 // Max z (= amount of tile levels)
                 var sql1 = "SELECT MAX(z) FROM quadtree_full;";
@@ -80,16 +83,17 @@ namespace B3dm.Tileset
 
                 var cmd = new NpgsqlCommand(sql1, conn);
                 var reader = cmd.ExecuteReader();
+
                 while (reader.Read()) {
                     var max_z = reader.GetInt32(0);
 
                     foreach (int i in Enumerable.Range(0, max_z + 1)) {
-                        used_nodes.Add(new SortedSet<int>());
+                        used_nodes_indices.Add(new Dictionary<String, (String, Tile)>());
+                        used_nodes.Add(new Dictionary<String, (String, Tile)>());
                     }
                     
                 }
                 reader.Close();
-
 
                 cmd = new NpgsqlCommand(sql2, conn);
                 reader = cmd.ExecuteReader();
@@ -102,13 +106,22 @@ namespace B3dm.Tileset
                     var node_z = reader.GetInt32(4);
                     var b3dm_id = reader.GetString(6);
                     var geom_stream = reader.GetStream(7);
-                    
-                    var level = 0;
-                    foreach (string i in node_id.Split('-')) {
-                    
-                        used_nodes[level].Add(Int32.Parse(i));
 
-                        level += 1;
+                    
+                    string[] parent_ids = parent_id.Split('-');
+                    List<string> p_ids = new List<string>(parent_ids);
+                    
+                    var parent_levels = parent_ids.Length;
+                    
+                    
+                    foreach (int level in Enumerable.Range(0, parent_levels).Reverse()) {
+                        
+                        var id = String.Join("-", p_ids.GetRange(0, level+1));
+
+                        if ( !used_nodes_indices[level].ContainsKey(id) ) {
+                            used_nodes_indices[level].Add(id, (null, null));
+                        }
+
 
                     }
 
@@ -122,13 +135,74 @@ namespace B3dm.Tileset
                         GeometricError = 0
                     };
 
-                    tiles.Add(tile);
+                    leaf_tiles[node_id] = (parent_id, tile);
 
                 }
 
                 reader.Close();
-                conn.Close();
 
+                var level_i = 0;
+                foreach ( var level in used_nodes_indices ) {
+
+                    List<string> keys = new List<string>(level.Keys);
+
+                    string keys_str = string.Format("'{0}'", string.Join("','", keys));
+                    // Console.WriteLine(keys_str);
+
+                    var sql3 = $"SELECT id, pid, ST_AsBinary(geom) FROM quadtree_full WHERE id in ({keys_str})";
+
+                    cmd = new NpgsqlCommand(sql3, conn);
+                    reader = cmd.ExecuteReader();
+                    while ( reader.Read() ) {
+
+                        var id = reader.GetString(0);
+                        var pid = reader.GetString(1);
+                        var geom_stream = reader.GetStream(2);
+                        var node_geom = Geometry.Deserialize<WkbSerializer>(geom_stream);
+
+                        var bbox = node_geom.GetBoundingBox();
+                        var from = new Point(bbox.XMin, bbox.YMin);
+                        var to = new Point(bbox.XMax, bbox.YMax);
+
+                        var tile = new Tile(0, new BoundingBox((double)from.X, (double)from.Y, (double)to.X, (double)to.Y)) {
+                            Lod = 0,
+                            GeometricError = 0,
+                            Children = new List<Tile>()
+                        };
+
+                        used_nodes[level_i][id] = (pid, tile);
+
+                    }
+
+                    level_i += 1;
+
+                    reader.Close();
+
+                }
+
+                foreach ( KeyValuePair<String, (String, Tile)> leaf in leaf_tiles ) {
+
+                    var pid = leaf.Value.Item1;
+                    var tile = leaf.Value.Item2;
+                    var parent_level = pid.Split('-').Length - 1;
+                    used_nodes[parent_level][pid].Item2.Children.Add(tile);
+
+                }
+
+                foreach ( var i in Enumerable.Range(1, used_nodes.Count - 1).Reverse() ) {
+                    foreach ( KeyValuePair<String, (String, Tile)> entry in used_nodes[i] ) {
+
+                        var node = entry.Value;
+                        var plevel = i - 1;
+                        used_nodes[plevel][node.Item1].Item2.Children.Add(node.Item2);
+
+                    }
+                }
+
+                Console.WriteLine(used_nodes[0]["0"].Item2.Children.Count);
+                tiles.Add(used_nodes[0]["0"].Item2);
+
+                conn.Close();
                 return (counter, tiles);
 
             }

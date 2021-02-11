@@ -7,7 +7,9 @@ namespace B3dm.Tileset
         public static int CountTiles(List<Tile> tiles, int startValue)
         {
             foreach (var tile in tiles) {
-                startValue++;
+                if ( tile.Id != 0 ) {
+                    startValue++;
+                }
                 if (tile.Children != null) {
                     startValue = CountTiles(tile.Children, startValue);
                 }

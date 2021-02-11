@@ -139,9 +139,19 @@ namespace pg2b3dm
         private static int WriteTiles(NpgsqlConnection conn, string geometryTable, string geometryColumn, string idcolumn, double[] translation, List<Tile> tiles, int epsg, string outputPath, int counter, int maxcount, string colorColumn = "", string attributesColumn = "", string lodColumn="", bool SkipTiles=false)
         {
             foreach (var t in tiles) {
+
+                if (t.Children != null) {
+                    counter = WriteTiles(conn, geometryTable, geometryColumn, idcolumn, translation, t.Children, epsg, outputPath, counter, maxcount, colorColumn, attributesColumn, lodColumn, SkipTiles);
+                }
+
+                // Tiles with Id=0 are nodes
+                if ( t.Id == 0 ) {
+                    continue;
+                }
+
                 counter++;
 
-                var filename = $"{outputPath}/tiles/{counter}.b3dm";
+                var filename = $"{outputPath}/tiles/{t.Id}.b3dm";
                 if (SkipTiles && File.Exists(filename))
                 {
                     continue;
@@ -158,10 +168,6 @@ namespace pg2b3dm
                 var b3dm = B3dmCreator.GetB3dm(attributesColumn, attributes, triangleCollection);
 
                 B3dmWriter.WriteB3dm(filename, b3dm);
-
-                if (t.Children != null) {
-                    counter = WriteTiles(conn, geometryTable, geometryColumn, idcolumn, translation, t.Children, epsg, outputPath, counter, maxcount, colorColumn, attributesColumn, lodColumn, SkipTiles);
-                }
 
             }
             return counter;

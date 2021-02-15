@@ -120,17 +120,22 @@ namespace pg2b3dm
             return res;
         }
 
-        private static void CalculateBoundingBoxes(double[] translation, List<Tile> tiles, double minZ, double maxZ)
+        private static void CalculateBoundingBoxes(double[] translation, List<Tile> tiles, double minZ, double maxZ, int level=0)
         {
             foreach (var t in tiles) {
+
+                if (level > 0) {
+                    maxZ -= (maxZ - minZ) / 2;
+                }
 
                 var bb = t.BoundingBox;
                 var bvol = new BoundingBox3D(bb.XMin, bb.YMin, minZ, bb.XMax, bb.YMax, maxZ);
                 var bvolRotated = BoundingBoxCalculator.TranslateRotateX(bvol, Reverse(translation), Math.PI / 2);
+                level += 1;
 
                 if (t.Children != null) {
 
-                    CalculateBoundingBoxes(translation, t.Children, minZ, maxZ);
+                    CalculateBoundingBoxes(translation, t.Children, minZ, maxZ, level);
                 }
                 t.Boundingvolume = TileCutter.GetBoundingvolume(bvolRotated);
             }

@@ -40,7 +40,10 @@ namespace pg2b3dm
         [Option("skiptiles", Default = false, HelpText = "Skip creation of existing tiles")]
         public bool SkipTiles { get; set; }
 
-        [Option("quadtree", Required = false, Default = "", HelpText = "Quadtree input file path")]
-        public string QuadtreePath { get; set; }
+        [Option("qttable", Required = true, HelpText = "Pre-defined quadtree full table")]
+        public string QuadtreeTable { get; set; }
+
+        [Option("leavestable", Required = true, HelpText = "Pre-defined quadtree leaves table")]
+        public string LeavesTable { get; set; }
     }
 }

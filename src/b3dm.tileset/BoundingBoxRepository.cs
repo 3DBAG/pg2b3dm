@@ -23,11 +23,11 @@ namespace B3dm.Tileset
             return exists;
         }
 
-        public static BoundingBox3D GetBoundingBox3DForTable(NpgsqlConnection conn, string geometry_table, string geometry_column)
+        public static BoundingBox3D GetBoundingBox3DForTable(NpgsqlConnection conn, string geometry_table, string geometry_column, string quadtree_table)
         {
             conn.Open();
 
-            var sql1 = "SELECT MAX(z) FROM quadtree_full;";
+            var sql1 = $"SELECT MAX(z) FROM {quadtree_table};";
             var cmd = new NpgsqlCommand(sql1, conn);
             var reader = cmd.ExecuteReader();
             reader.Read();
@@ -50,10 +50,10 @@ namespace B3dm.Tileset
             return new BoundingBox3D() { XMin = xmin, YMin = ymin, ZMin = zmin, XMax = xmax, YMax = ymax, ZMax = zmax };
         }
 
-        public static BoundingBox3D GetBoundingBox3DForQT(NpgsqlConnection conn) {
+        public static BoundingBox3D GetBoundingBox3DForQT(NpgsqlConnection conn, string quadtree_table) {
 
             conn.Open();
-            var sql = "SELECT ST_AsBinary(geom) FROM quadtree_full WHERE z=0";
+            var sql = $"SELECT ST_AsBinary(geom) FROM {quadtree_table} WHERE z=0";
             var cmd = new NpgsqlCommand(sql, conn);
             var reader = cmd.ExecuteReader();
             reader.Read();

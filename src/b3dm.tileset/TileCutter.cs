@@ -27,9 +27,10 @@ namespace B3dm.Tileset
             return bytes;
         }
 
-        public static (int tileId, List<Tile> tiles) GetTiles(int tileId, NpgsqlConnection conn, double extentTile, string geometryTable, string geometryColumn, BoundingBox3D box3d, int epsg, int currentLod, List<int> lods, double[] geometricErrors, string quadtree_table, string leaves_table, string lodcolumn = "")
+        public static (int tileId, List<Tile> tiles, List<Tile> leaves) GetTiles(int tileId, NpgsqlConnection conn, double extentTile, string geometryTable, string geometryColumn, BoundingBox3D box3d, int epsg, int currentLod, List<int> lods, double[] geometricErrors, string quadtree_table, string leaves_table, string lodcolumn = "")
         {
             var tiles = new List<Tile>();
+            var leaves = new List<Tile>();
 
             var used_nodes_indices = new List<Dictionary<String, (String, Tile)>>();
             var used_nodes = new List<Dictionary<String, (String, Tile)>>();
@@ -83,7 +84,6 @@ namespace B3dm.Tileset
                         used_nodes_indices[level].Add(id, (null, null));
                     }
 
-
                 }
 
                 var leaf_geom = Geometry.Deserialize<WkbSerializer>(geom_stream);
@@ -97,6 +97,7 @@ namespace B3dm.Tileset
                 };
 
                 leaf_tiles[node_id] = (parent_id, tile);
+                leaves.Add(tile);
 
             }
 
@@ -164,7 +165,7 @@ namespace B3dm.Tileset
             tiles.Add(used_nodes[0]["0"].Item2);
 
             conn.Close();
-            return (counter, tiles);
+            return (counter, tiles, leaves);
 
             
         }

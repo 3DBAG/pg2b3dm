@@ -40,6 +40,9 @@ namespace pg2b3dm
         [Option("skiptiles", Default = false, HelpText = "Skip creation of existing tiles")]
         public bool SkipTiles { get; set; }
 
+        [Option("maxthreads", Required = false, Default = -1, HelpText = "The maximum number of threads to use")]
+        public int MaxThreads { get; set; }
+
         [Option("qttable", Required = true, HelpText = "Pre-defined quadtree full table")]
         public string QuadtreeTable { get; set; }
 

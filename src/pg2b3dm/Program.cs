@@ -175,7 +175,7 @@ namespace pg2b3dm
                     pb.Refresh(counter, $"{counter}/{maxcount} - {perc:F}%");
                 }
 
-                var filename = $"{outputPath}/tiles/{c + 1}.b3dm";
+                var filename = $"{outputPath}/tiles/{t.Id}.b3dm";
                 if (SkipTiles && File.Exists(filename))
                 {
                     return new_conn;

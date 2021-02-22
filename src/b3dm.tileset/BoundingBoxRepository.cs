@@ -12,7 +12,7 @@ namespace B3dm.Tileset
     {
         public static bool HasFeaturesInBox(NpgsqlConnection conn, string geometry_table, string geometry_column, Point from, Point to, int epsg, string lodQuery)
         {
-            var sql = $"select exists(select {geometry_column} from {geometry_table} where ST_3DIntersects({geometry_column}, ST_MakeEnvelope({from.X}, {from.Y}, {to.X}, {to.Y}, {epsg})))";
+            var sql = $"select exists(select {geometry_column} from {geometry_table} where ST_Intersects(ST_Centroid(ST_Envelope({geometry_column})), ST_MakeEnvelope({from.X}, {from.Y}, {to.X}, {to.Y}, {epsg})))";
             conn.Open();
             var cmd = new NpgsqlCommand(sql, conn);
             var reader = cmd.ExecuteReader();
@@ -90,7 +90,7 @@ namespace B3dm.Tileset
             var sqlFrom = "FROM " + geometry_table;
 
             var lodQuery = LodQuery.GetLodQuery(lodColumn, t.Lod);
-            var sqlWhere = $" WHERE tile_id='{t.Id}'";
+            var sqlWhere = $" WHERE ST_Intersects(ST_Centroid(ST_Envelope({ geometry_column})), ST_MakeEnvelope({ t.BoundingBox.XMin}, { t.BoundingBox.YMin}, { t.BoundingBox.XMax}, { t.BoundingBox.YMax}, { epsg})) { lodQuery}";
 
             var sql = sqlselect + sqlFrom + sqlWhere;
 

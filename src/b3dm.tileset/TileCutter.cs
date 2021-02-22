@@ -40,7 +40,7 @@ namespace B3dm.Tileset
             // Max z (= amount of tile levels)
             var sql1 = $"SELECT MAX(z) FROM {quadtree_table};";
             // Matches leaves with quadtree nodes
-            var sql2 = $"SELECT f.*, l.tile_id AS b3dm_id, ST_AsBinary(l.tile_polygon) AS leaf_geom FROM {quadtree_table} AS f, {leaves_table} AS l WHERE ST_Intersects(l.tile_polygon, f.geom_b) AND (ST_Equals(l.tile_polygon, f.geom_b))";
+            var sql2 = $"SELECT f.*, l.tile_id AS b3dm_id, ST_AsBinary(l.tile_polygon) AS leaf_geom FROM {quadtree_table} AS f, {leaves_table} AS l WHERE ST_Intersects(l.tile_polygon, f.geom) AND (ST_Equals(l.tile_polygon, f.geom))";
             conn.Open();
 
             var cmd = new NpgsqlCommand(sql1, conn);
@@ -66,8 +66,8 @@ namespace B3dm.Tileset
                 var node_x = reader.GetInt32(2);
                 var node_y = reader.GetInt32(3);
                 var node_z = reader.GetInt32(4);
-                var b3dm_id = reader.GetString(7);
-                var geom_stream = reader.GetStream(8);
+                var b3dm_id = reader.GetString(6);
+                var geom_stream = reader.GetStream(7);
 
                 
                 string[] parent_ids = parent_id.Split('-');
@@ -111,7 +111,7 @@ namespace B3dm.Tileset
                 string keys_str = string.Format("'{0}'", string.Join("','", keys));
                 // Console.WriteLine(keys_str);
 
-                var sql3 = $"SELECT id, pid, ST_AsBinary(geom_b) FROM {quadtree_table} WHERE id in ({keys_str})";
+                var sql3 = $"SELECT id, pid, ST_AsBinary(geom) FROM {quadtree_table} WHERE id in ({keys_str})";
 
                 cmd = new NpgsqlCommand(sql3, conn);
                 reader = cmd.ExecuteReader();

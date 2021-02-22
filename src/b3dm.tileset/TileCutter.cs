@@ -93,7 +93,7 @@ namespace B3dm.Tileset
 
                 var tile = new Tile(Int32.Parse(b3dm_id), new BoundingBox((double)from.X, (double)from.Y, (double)to.X, (double)to.Y)) {
                     Lod = 0,
-                    GeometricError = 0
+                    GeometricError = 500
                 };
 
                 leaf_tiles[node_id] = (parent_id, tile);
@@ -128,7 +128,7 @@ namespace B3dm.Tileset
 
                     var tile = new Tile(0, new BoundingBox((double)from.X, (double)from.Y, (double)to.X, (double)to.Y)) {
                         Lod = 0,
-                        GeometricError = 0,
+                        GeometricError = 500,
                         Children = new List<Tile>()
                     };
 

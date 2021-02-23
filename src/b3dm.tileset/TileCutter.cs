@@ -29,59 +29,57 @@ namespace B3dm.Tileset
 
         public static (int tileId, List<Tile> tiles, List<Tile> leaves) GetTiles(int tileId, NpgsqlConnection conn, double extentTile, string geometryTable, string geometryColumn, BoundingBox3D box3d, int epsg, int currentLod, List<int> lods, double[] geometricErrors, string quadtree_table, string leaves_table, string lodcolumn = "")
         {
+            // "tiles" to create the tileset with, "leaves" to give to the "writeTiles" function (this flat list helps for multithreading).
             var tiles = new List<Tile>();
             var leaves = new List<Tile>();
 
             var used_nodes_indices = new List<Dictionary<String, (String, Tile)>>();
             var used_nodes = new List<Dictionary<String, (String, Tile)>>();
+            var leaf_nodes = new Dictionary<String, (String, Tile)>();
 
-            var leaf_tiles = new Dictionary<String, (String, Tile)>();
+            // Standard geometric error (don't set to 0, it will make 3DTilesRendererJS skip the tiles)
+            var error = 500;
 
-            // Max z (= amount of tile levels)
             var sql1 = $"SELECT MAX(z) FROM {quadtree_table};";
-            // Matches leaves with quadtree nodes
             var sql2 = $"SELECT f.*, l.tile_id AS b3dm_id, ST_AsBinary(l.tile_polygon) AS leaf_geom FROM {quadtree_table} AS f, {leaves_table} AS l WHERE ST_Intersects(l.tile_polygon, f.geom) AND (ST_Equals(l.tile_polygon, f.geom))";
             conn.Open();
-
             var cmd = new NpgsqlCommand(sql1, conn);
             var reader = cmd.ExecuteReader();
+            reader.Read();
 
-            while (reader.Read()) {
-                var max_z = reader.GetInt32(0);
+            // Init nested lists with amount of tile levels
+            var max_z = reader.GetInt32(0);
 
-                foreach (int i in Enumerable.Range(0, max_z + 1)) {
-                    used_nodes_indices.Add(new Dictionary<String, (String, Tile)>());
-                    used_nodes.Add(new Dictionary<String, (String, Tile)>());
-                }
-                
+            foreach (int i in Enumerable.Range(0, max_z + 1)) {
+                used_nodes_indices.Add(new Dictionary<String, (String, Tile)>());
+                used_nodes.Add(new Dictionary<String, (String, Tile)>());
             }
+                
             reader.Close();
 
+            // Store all leaves as tiles and keep the indices of their parents. Query matches leaves with quadtree nodes
             cmd = new NpgsqlCommand(sql2, conn);
             reader = cmd.ExecuteReader();
             while (reader.Read()) {
 
                 var parent_id = reader.GetString(0);
                 var node_id = reader.GetString(1);
-                var node_x = reader.GetInt32(2);
-                var node_y = reader.GetInt32(3);
-                var node_z = reader.GetInt32(4);
                 var b3dm_id = reader.GetString(6);
                 var geom_stream = reader.GetStream(7);
-
                 
                 string[] parent_ids = parent_id.Split('-');
                 List<string> p_ids = new List<string>(parent_ids);
                 
                 var parent_levels = parent_ids.Length;
                 
-                
                 foreach (int level in Enumerable.Range(0, parent_levels).Reverse()) {
                     
                     var id = String.Join("-", p_ids.GetRange(0, level+1));
 
                     if ( !used_nodes_indices[level].ContainsKey(id) ) {
+
                         used_nodes_indices[level].Add(id, (null, null));
+                        
                     }
 
                 }
@@ -93,26 +91,24 @@ namespace B3dm.Tileset
 
                 var tile = new Tile(Int32.Parse(b3dm_id), new BoundingBox((double)from.X, (double)from.Y, (double)to.X, (double)to.Y)) {
                     Lod = 0,
-                    GeometricError = 500
+                    GeometricError = error
                 };
 
-                leaf_tiles[node_id] = (parent_id, tile);
+                leaf_nodes[node_id] = (parent_id, tile);
                 leaves.Add(tile);
 
             }
 
             reader.Close();
 
+            // Create tiles for all non-leaf nodes that are used
             var level_i = 0;
             foreach ( var level in used_nodes_indices ) {
 
                 List<string> keys = new List<string>(level.Keys);
-
                 string keys_str = string.Format("'{0}'", string.Join("','", keys));
-                // Console.WriteLine(keys_str);
 
                 var sql3 = $"SELECT id, pid, ST_AsBinary(geom) FROM {quadtree_table} WHERE id in ({keys_str})";
-
                 cmd = new NpgsqlCommand(sql3, conn);
                 reader = cmd.ExecuteReader();
                 while ( reader.Read() ) {
@@ -128,7 +124,7 @@ namespace B3dm.Tileset
 
                     var tile = new Tile(0, new BoundingBox((double)from.X, (double)from.Y, (double)to.X, (double)to.Y)) {
                         Lod = 0,
-                        GeometricError = 500,
+                        GeometricError = error,
                         Children = new List<Tile>()
                     };
 
@@ -142,7 +138,8 @@ namespace B3dm.Tileset
 
             }
 
-            foreach ( KeyValuePair<String, (String, Tile)> leaf in leaf_tiles ) {
+            // Add leaves as child to their parent node
+            foreach ( KeyValuePair<String, (String, Tile)> leaf in leaf_nodes ) {
 
                 var pid = leaf.Value.Item1;
                 var tile = leaf.Value.Item2;
@@ -151,6 +148,7 @@ namespace B3dm.Tileset
 
             }
 
+            // Link all nodes bottom-up
             foreach ( var i in Enumerable.Range(1, used_nodes.Count - 1).Reverse() ) {
                 foreach ( KeyValuePair<String, (String, Tile)> entry in used_nodes[i] ) {
 
@@ -161,14 +159,16 @@ namespace B3dm.Tileset
                 }
             }
 
-            Console.WriteLine(used_nodes[0]["0"].Item2.Children.Count);
-            tiles.Add(used_nodes[0]["0"].Item2);
+            // Add tiles of tile level 1 to output (omitting the root tile)
+            foreach (KeyValuePair<String, (String, Tile)> entry in used_nodes[1]) {
+                tiles.Add(entry.Value.Item2);
+            }
 
             conn.Close();
             return (counter, tiles, leaves);
-
             
         }
 
     }
+
 }

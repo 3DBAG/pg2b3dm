@@ -39,5 +39,8 @@ namespace pg2b3dm
 
         [Option("skiptiles", Default = false, HelpText = "Skip creation of existing tiles")]
         public bool SkipTiles { get; set; }
+
+        [Option("compression", Required = false, Default = "", HelpText = "Tiles compression type (gzip)")]
+        public string Compression { get; set; }
     }
 }

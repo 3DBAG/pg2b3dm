@@ -27,24 +27,16 @@ namespace B3dm.Tileset
         {
             conn.Open();
 
-            var sql1 = $"SELECT MAX(z) FROM {quadtree_table};";
-            var cmd = new NpgsqlCommand(sql1, conn);
+            var sql = $"SELECT st_xmin(geom1), st_ymin(geom1), st_zmin(geom1), st_xmax(geom1), st_ymax(geom1), st_zmax(geom1) FROM (select ST_3DExtent({geometry_column}) as geom1 from {geometry_table}) as t";
+            var cmd = new NpgsqlCommand(sql, conn);
             var reader = cmd.ExecuteReader();
-            reader.Read();
-            var max_z = reader.GetInt32(0);
-            reader.Close();
-
-            // Multiply bbox z with amount of quadtree levels in order to simulate octree heightz
-            var sql2 = $"SELECT st_xmin(geom1), st_ymin(geom1), st_zmin(geom1), st_xmax(geom1), st_ymax(geom1), st_zmax(geom1) FROM (select ST_3DExtent({geometry_column}) as geom1 from {geometry_table}) as t";
-            cmd = new NpgsqlCommand(sql2, conn);
-            reader = cmd.ExecuteReader();
             reader.Read();
             var xmin = reader.GetDouble(0);
             var ymin = reader.GetDouble(1);
             var zmin = reader.GetDouble(2);
             var xmax = reader.GetDouble(3);
             var ymax = reader.GetDouble(4);
-            var zmax = reader.GetDouble(5) * max_z;
+            var zmax = reader.GetDouble(5);
             reader.Close();
             conn.Close();
             return new BoundingBox3D() { XMin = xmin, YMin = ymin, ZMin = zmin, XMax = xmax, YMax = ymax, ZMax = zmax };

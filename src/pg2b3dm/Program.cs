@@ -106,7 +106,9 @@ namespace pg2b3dm
                 Console.WriteLine();
                 var nrOfTiles = RecursiveTileCounter.CountTiles(tiles.tiles, 0);
                 Console.WriteLine($"tiles with features: {nrOfTiles} ");
-                CalculateBoundingBoxes(translation, tiles.tiles, bbox3d.ZMin, bbox3d.ZMax);
+                conn.Open();
+                CalculateBoundingBoxes(conn, translation, tiles.tiles, geometryTable, geometryColumn, sr);
+                conn.Close();
                 Console.WriteLine("writing tileset.json...");
                 var json = TreeSerializer.ToJson(tiles.tiles, translation, box, geometricErrors[0], o.Refinement);
                 File.WriteAllText($"{o.Output}/tileset.json", json);
@@ -126,25 +128,33 @@ namespace pg2b3dm
             return res;
         }
 
-        private static void CalculateBoundingBoxes(double[] translation, List<Tile> tiles, double minZ, double maxZ, int level=0)
+        private static void CalculateBoundingBoxes(NpgsqlConnection conn, double[] translation, List<Tile> tiles, string geometry_table, string geometry_column, int epsg)
         {
+
             foreach (var t in tiles) {
 
-                if (level > 0) {
-                    maxZ -= (maxZ - minZ) / 2;
-                }
-
                 var bb = t.BoundingBox;
+
+                var sql = $"SELECT ST_ZMin(ST_3DExtent({ geometry_column })), ST_ZMax(ST_3DExtent({ geometry_column })) FROM { geometry_table } WHERE ST_Intersects(ST_Centroid(ST_Envelope({ geometry_column })), ST_MakeEnvelope({ bb.XMin }, { bb.YMin }, { bb.XMax }, { bb.YMax }, { epsg }))";
+                var cmd = new NpgsqlCommand(sql, conn);
+                var reader = cmd.ExecuteReader();
+                reader.Read();
+                var minZ = reader.IsDBNull(0) ? 0 : reader.GetDouble(0);
+                var maxZ = reader.IsDBNull(1) ? 0 : reader.GetDouble(1);
+
+                reader.Close();
+
                 var bvol = new BoundingBox3D(bb.XMin, bb.YMin, minZ, bb.XMax, bb.YMax, maxZ);
                 var bvolRotated = BoundingBoxCalculator.TranslateRotateX(bvol, Reverse(translation), Math.PI / 2);
-                level += 1;
 
                 if (t.Children != null) {
 
-                    CalculateBoundingBoxes(translation, t.Children, minZ, maxZ, level);
+                    CalculateBoundingBoxes(conn, translation, t.Children, geometry_table, geometry_column, epsg);
+
                 }
                 t.Boundingvolume = TileCutter.GetBoundingvolume(bvolRotated);
             }
+
         }
 
         private static int WriteTiles(string connectionString, string geometryTable, string geometryColumn, string idcolumn, double[] translation, List<Tile> tiles, int epsg, string outputPath, int counter, int maxcount, string colorColumn = "", string attributesColumn = "", string lodColumn="", bool SkipTiles=false, int MaxThreads=-1)

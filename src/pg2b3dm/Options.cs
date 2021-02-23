@@ -48,5 +48,8 @@ namespace pg2b3dm
 
         [Option("leavestable", Required = true, HelpText = "Pre-defined quadtree leaves table")]
         public string LeavesTable { get; set; }
+        
+        [Option("compression", Required = false, Default = "", HelpText = "Tiles compression type (gzip)")]
+        public string Compression { get; set; }
     }
 }

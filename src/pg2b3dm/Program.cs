@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.IO.Compression;
 using B3dm.Tile;
 using B3dm.Tileset;
 using CommandLine;
@@ -37,6 +38,12 @@ namespace pg2b3dm
                     password = PasswordAsker.GetPassword();
                     connectionString += $";password={password}";
                     Console.WriteLine();
+                }
+
+                if (o.Compression != "" && o.Compression != "gzip")
+                {
+                    Console.WriteLine($"the entered compression type \"{o.Compression}\" is not supported, output will be uncompressed!");
+                    o.Compression = "";
                 }
 
                 Console.WriteLine($"start processing....");
@@ -113,7 +120,7 @@ namespace pg2b3dm
                 var json = TreeSerializer.ToJson(tiles.tiles, translation, box, geometricErrors[0], o.Refinement);
                 File.WriteAllText($"{o.Output}/tileset.json", json);
 
-                WriteTiles(connectionString, geometryTable, geometryColumn, idcolumn, translation, tiles.leaves, sr, o.Output, 0, nrOfTiles, o.RoofColorColumn, o.AttributesColumn, o.LodColumn, o.SkipTiles, o.MaxThreads);
+                WriteTiles(connectionString, geometryTable, geometryColumn, idcolumn, translation, tiles.leaves, sr, o.Output, 0, nrOfTiles, o.RoofColorColumn, o.AttributesColumn, o.LodColumn, o.SkipTiles, o.MaxThreads, o.Compression);
 
                 stopWatch.Stop();
                 Console.WriteLine();
@@ -157,7 +164,8 @@ namespace pg2b3dm
 
         }
 
-        private static int WriteTiles(string connectionString, string geometryTable, string geometryColumn, string idcolumn, double[] translation, List<Tile> tiles, int epsg, string outputPath, int counter, int maxcount, string colorColumn = "", string attributesColumn = "", string lodColumn="", bool SkipTiles=false, int MaxThreads=-1)
+        private static int WriteTiles(string connectionString, string geometryTable, string geometryColumn, string idcolumn, double[] translation, List<Tile> tiles, int epsg, string outputPath, int counter, int maxcount, string colorColumn = "", string attributesColumn = "", string lodColumn="", bool SkipTiles=false, int MaxThreads=-1, string compressionType="")
+        
         {
 
             object counterLock = new object();
@@ -199,7 +207,22 @@ namespace pg2b3dm
 
                 var b3dm = B3dmCreator.GetB3dm(attributesColumn, attributes, triangleCollection);
 
-                B3dmWriter.WriteB3dm(filename, b3dm);
+                var bytes = b3dm.ToBytes();
+
+                if (compressionType == "")
+                {
+                    File.WriteAllBytes(filename, bytes);
+                }
+                else if (compressionType == "gzip")
+                {
+                    using (FileStream fileToCompress = File.Create(filename + ".gz")) 
+                    {
+                        using (GZipStream compressionStream = new GZipStream(fileToCompress, CompressionMode.Compress)) 
+                        {
+                            compressionStream.Write(bytes, 0, bytes.Length);
+                        }
+                    }
+                }
 
                 if (t.Children != null) {
                     counter = WriteTiles(connectionString, geometryTable, geometryColumn, idcolumn, translation, t.Children, epsg, outputPath, counter, maxcount, colorColumn, attributesColumn, lodColumn, SkipTiles);

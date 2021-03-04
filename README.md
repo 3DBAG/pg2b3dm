@@ -1,5 +1,12 @@
 # pg2b3dm
  
+ Version 1.2 has multithreading, the use of a custom quadtree (stored in a database) and gzip compression.
+ 
+ Example command:
+ `dotnet run -- -U jliempt -d baseregisters -t 'bag3d_v21020.export_3dtiles_lod22' -p 5432 -c 'geometrie' -i 'fid' -a 'attributes' --qttable tiles.xyz_tiles --leavestable tiles.bag_tiles_3k --maxthreads 40 --compression gzip -o 21020_lod22`
+ 
+ 
+
  ![.NET Core](https://github.com/Geodan/pg2b3dm/workflows/.NET%20Core/badge.svg)
 
 Tool for converting from PostGIS to [3D Tiles](https://github.com/AnalyticalGraphicsInc/3d-tiles)/b3dm tiles. This software started as a port of py3dtiles (https://github.com/Oslandia/py3dtiles) 

@@ -97,9 +97,9 @@ namespace pg2b3dm
                 // We now need the bounding box of the quadtree (which equals the geometry of the root node), but it doesn't have z-value
                 // Therefore, get the ZMin and ZMax from the table
                 var bbox_qt = BoundingBoxRepository.GetBoundingBox3DForQT(conn, QuadtreeTable);
-                // var bbox_table = BoundingBoxRepository.GetBoundingBox3DForTable(conn, geometryTable, geometryColumn, QuadtreeTable);
-                // bbox_qt.ZMin = bbox_table.ZMin;
-                // bbox_qt.ZMax = bbox_table.ZMax;
+                var bbox_table = BoundingBoxRepository.GetBoundingBox3DForTable(conn, geometryTable, geometryColumn, QuadtreeTable);
+                bbox_qt.ZMin = bbox_table.ZMin;
+                bbox_qt.ZMax = bbox_table.ZMax;
                 var bbox3d = bbox_qt;
                 
                 Console.WriteLine($"3D Boundingbox {geometryTable}.{geometryColumn}: [{bbox3d.XMin}, {bbox3d.YMin}, {bbox3d.ZMin},{bbox3d.XMax},{bbox3d.YMax}, {bbox3d.ZMax}]");

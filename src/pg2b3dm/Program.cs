@@ -97,9 +97,9 @@ namespace pg2b3dm
                 // We now need the bounding box of the quadtree (which equals the geometry of the root node), but it doesn't have z-value
                 // Therefore, get the ZMin and ZMax from the table
                 var bbox_qt = BoundingBoxRepository.GetBoundingBox3DForQT(conn, QuadtreeTable);
-                var bbox_table = BoundingBoxRepository.GetBoundingBox3DForTable(conn, geometryTable, geometryColumn, QuadtreeTable);
-                bbox_qt.ZMin = bbox_table.ZMin;
-                bbox_qt.ZMax = bbox_table.ZMax;
+                // var bbox_table = BoundingBoxRepository.GetBoundingBox3DForTable(conn, geometryTable, geometryColumn, QuadtreeTable);
+                // bbox_qt.ZMin = bbox_table.ZMin;
+                // bbox_qt.ZMax = bbox_table.ZMax;
                 var bbox3d = bbox_qt;
                 
                 Console.WriteLine($"3D Boundingbox {geometryTable}.{geometryColumn}: [{bbox3d.XMin}, {bbox3d.YMin}, {bbox3d.ZMin},{bbox3d.XMax},{bbox3d.YMax}, {bbox3d.ZMax}]");
@@ -138,11 +138,31 @@ namespace pg2b3dm
         private static void CalculateBoundingBoxes(NpgsqlConnection conn, double[] translation, List<Tile> tiles, string geometry_table, string geometry_column, int epsg)
         {
 
+            void getChildrenTileIDs( Tile t, List<string> ids ) {
+
+                if ( t.Id != 0 ) {
+                    ids.Add( t.Id.ToString() );
+                }
+
+                if ( t.Children != null ) {
+                    foreach ( var c in t.Children ) {
+                        getChildrenTileIDs( c, ids );
+                    }
+                }
+
+                return;
+
+            }
+
             foreach (var t in tiles) {
 
                 var bb = t.BoundingBox;
+                var tid = t.Id;
+                var childrenIds = new List<string>();
+                getChildrenTileIDs( t, childrenIds );
+                var childrenIdsStr = "{" + '"' + String.Join("\",\"", childrenIds) + '"' + "}";
 
-                var sql = $"SELECT ST_ZMin(ST_3DExtent({ geometry_column })), ST_ZMax(ST_3DExtent({ geometry_column })) FROM { geometry_table } WHERE ST_Intersects(ST_Centroid(ST_Envelope({ geometry_column })), ST_MakeEnvelope({ bb.XMin }, { bb.YMin }, { bb.XMax }, { bb.YMax }, { epsg }))";
+                var sql = $"SELECT ST_ZMin(ST_3DExtent({ geometry_column })), ST_ZMax(ST_3DExtent({ geometry_column })) FROM { geometry_table } WHERE tile_id=ANY (' { childrenIdsStr } ') ";
                 var cmd = new NpgsqlCommand(sql, conn);
                 var reader = cmd.ExecuteReader();
                 reader.Read();

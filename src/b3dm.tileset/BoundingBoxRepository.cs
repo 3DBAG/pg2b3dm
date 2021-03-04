@@ -82,7 +82,7 @@ namespace B3dm.Tileset
             var sqlFrom = "FROM " + geometry_table;
 
             var lodQuery = LodQuery.GetLodQuery(lodColumn, t.Lod);
-            var sqlWhere = $" WHERE ST_Intersects(ST_Centroid(ST_Envelope({ geometry_column})), ST_MakeEnvelope({ t.BoundingBox.XMin}, { t.BoundingBox.YMin}, { t.BoundingBox.XMax}, { t.BoundingBox.YMax}, { epsg})) { lodQuery}";
+            var sqlWhere = $" WHERE tile_id='{t.Id}'";
 
             var sql = sqlselect + sqlFrom + sqlWhere;
 

@@ -30,7 +30,7 @@ namespace pg2b3dm
                 o.User = string.IsNullOrEmpty(o.User) ? Environment.UserName : o.User;
                 o.Database = string.IsNullOrEmpty(o.Database) ? Environment.UserName : o.Database;
 
-                var connectionString = $"Host={o.Host};Username={o.User};Database={o.Database};Port={o.Port};Pooling=True;Command Timeout=120;passfile={o.PassFile}";
+                var connectionString = $"Host={o.Host};Username={o.User};Database={o.Database};Port={o.Port};Pooling=True;Command Timeout=300;passfile={o.PassFile}";
                 var istrusted = TrustedConnectionChecker.HasTrustedConnection(connectionString);
 
                 if (!istrusted && o.PassFile == "") {
@@ -110,15 +110,15 @@ namespace pg2b3dm
                 var box = boundingboxAllFeatures.GetBox();
                 var sr = SpatialReferenceRepository.GetSpatialReference(conn, geometryTable, geometryColumn);
                 Console.WriteLine($"spatial reference: {sr}");
-                Console.WriteLine("reading quadtree...");
+                Console.WriteLine($"reading quadtree...");
                 var tiles = TileCutter.GetTiles(0, conn, o.ExtentTile, geometryTable, geometryColumn, bbox3d, sr, 0, lods, geometricErrors.Skip(1).ToArray(), QuadtreeTable, LeavesTable, lodcolumn);
                 Console.WriteLine();
-                var nrOfTiles = RecursiveTileCounter.CountTiles(tiles.tiles, 0);
-                Console.WriteLine($"tiles with features: {nrOfTiles} ");
                 conn.Open();
                 var leavesHeights = getLeavesHeights(conn, tiles.tiles, geometryTable, geometryColumn, tileIdColumn);
                 conn.Close();
                 CalculateBoundingBoxes(conn, translation, tiles.tiles, leavesHeights, geometryTable, geometryColumn, sr);
+                var nrOfTiles = RecursiveTileCounter.CountTiles(tiles.tiles, 0);
+                Console.WriteLine($"tiles with features: {nrOfTiles} ");
                 Console.WriteLine("writing tileset.json...");
                 var json = TreeSerializer.ToJson(tiles.tiles, translation, box, geometricErrors[0], o.Refinement);
                 File.WriteAllText($"{o.Output}/tileset.json", json);

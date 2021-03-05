@@ -30,7 +30,8 @@ namespace pg2b3dm
                 o.User = string.IsNullOrEmpty(o.User) ? Environment.UserName : o.User;
                 o.Database = string.IsNullOrEmpty(o.Database) ? Environment.UserName : o.Database;
 
-                var connectionString = $"Host={o.Host};Username={o.User};Database={o.Database};Port={o.Port};Pooling=True;Command Timeout=120";
+                // var connectionString = $"Host={o.Host};Username={o.User};Database={o.Database};Port={o.Port};Pooling=True;Command Timeout=120;Passfile={o.PgPass}";
+                var connectionString = $"Host={o.Host};Username={o.User};Database={o.Database};Port={o.Port};Pooling=True;Command Timeout=1000";
                 var istrusted = TrustedConnectionChecker.HasTrustedConnection(connectionString);
 
                 if (!istrusted) {
@@ -97,9 +98,10 @@ namespace pg2b3dm
                 // We now need the bounding box of the quadtree (which equals the geometry of the root node), but it doesn't have z-value
                 // Therefore, get the ZMin and ZMax from the table
                 var bbox_qt = BoundingBoxRepository.GetBoundingBox3DForQT(conn, QuadtreeTable);
-                // var bbox_table = BoundingBoxRepository.GetBoundingBox3DForTable(conn, geometryTable, geometryColumn, QuadtreeTable);
-                // bbox_qt.ZMin = bbox_table.ZMin;
-                // bbox_qt.ZMax = bbox_table.ZMax;
+                //var bbox_qt = new BoundingBox3D() { XMin = 0, YMin = 0, ZMin = 0, XMax = 0, YMax = 0, ZMax = 0 };
+                var bbox_table = BoundingBoxRepository.GetBoundingBox3DForTable(conn, geometryTable, geometryColumn, QuadtreeTable);
+                bbox_qt.ZMin = bbox_table.ZMin;
+                bbox_qt.ZMax = bbox_table.ZMax;
                 var bbox3d = bbox_qt;
                 
                 Console.WriteLine($"3D Boundingbox {geometryTable}.{geometryColumn}: [{bbox3d.XMin}, {bbox3d.YMin}, {bbox3d.ZMin},{bbox3d.XMax},{bbox3d.YMax}, {bbox3d.ZMax}]");
@@ -109,13 +111,15 @@ namespace pg2b3dm
                 var box = boundingboxAllFeatures.GetBox();
                 var sr = SpatialReferenceRepository.GetSpatialReference(conn, geometryTable, geometryColumn);
                 Console.WriteLine($"spatial reference: {sr}");
+                Console.WriteLine("reading quadtree...");
                 var tiles = TileCutter.GetTiles(0, conn, o.ExtentTile, geometryTable, geometryColumn, bbox3d, sr, 0, lods, geometricErrors.Skip(1).ToArray(), QuadtreeTable, LeavesTable, lodcolumn);
                 Console.WriteLine();
                 var nrOfTiles = RecursiveTileCounter.CountTiles(tiles.tiles, 0);
                 Console.WriteLine($"tiles with features: {nrOfTiles} ");
                 conn.Open();
-                CalculateBoundingBoxes(conn, translation, tiles.tiles, geometryTable, geometryColumn, sr);
+                var leavesHeights = getLeavesHeights(conn, tiles.tiles, geometryTable, geometryColumn);
                 conn.Close();
+                CalculateBoundingBoxes(conn, translation, tiles.tiles, leavesHeights, geometryTable, geometryColumn, sr);
                 Console.WriteLine("writing tileset.json...");
                 var json = TreeSerializer.ToJson(tiles.tiles, translation, box, geometricErrors[0], o.Refinement);
                 File.WriteAllText($"{o.Output}/tileset.json", json);
@@ -134,8 +138,45 @@ namespace pg2b3dm
             var res = new double[] { translation[0] * -1, translation[1] * -1, translation[2] * -1 };
             return res;
         }
+        private static Dictionary<String, (double, double)> getLeavesHeights( NpgsqlConnection conn, List<Tile> tiles, string geometry_table, string geometry_column ) {
 
-        private static void CalculateBoundingBoxes(NpgsqlConnection conn, double[] translation, List<Tile> tiles, string geometry_table, string geometry_column, int epsg)
+            void calculateLeavesHeights( Tile t, Dictionary<String, (double, double)> heights  ) {
+
+                if ( t.Id != 0 ) {
+
+                    var sql = $"SELECT ST_ZMin(ST_3DExtent({ geometry_column })), ST_ZMax(ST_3DExtent({ geometry_column })) FROM { geometry_table } WHERE tile_id='{ t.Id }'";
+                    var cmd = new NpgsqlCommand(sql, conn);
+                    var reader = cmd.ExecuteReader();
+                    reader.Read();
+                    var minZ = reader.IsDBNull(0) ? 0 : reader.GetDouble(0);
+                    var maxZ = reader.IsDBNull(1) ? 0 : reader.GetDouble(1);
+                    reader.Close();
+
+                    heights[ t.Id.ToString() ] = ( minZ, maxZ );
+
+                } else if ( t.Children != null ) {
+
+                    foreach ( var c in t.Children ) {
+                        calculateLeavesHeights( c, heights );
+                    }
+
+                }
+
+            }
+
+            var tileHeights = new Dictionary<String, (double, double)>();
+
+            foreach ( var t in tiles ) {
+
+                calculateLeavesHeights( t, tileHeights );
+
+            }
+
+            return tileHeights;
+
+        }
+
+        private static void CalculateBoundingBoxes(NpgsqlConnection conn, double[] translation, List<Tile> tiles, Dictionary<String, (double, double)> leavesHeights, string geometry_table, string geometry_column, int epsg)
         {
 
             void getChildrenTileIDs( Tile t, List<string> ids ) {
@@ -150,8 +191,6 @@ namespace pg2b3dm
                     }
                 }
 
-                return;
-
             }
 
             foreach (var t in tiles) {
@@ -160,23 +199,27 @@ namespace pg2b3dm
                 var tid = t.Id;
                 var childrenIds = new List<string>();
                 getChildrenTileIDs( t, childrenIds );
-                var childrenIdsStr = "{" + '"' + String.Join("\",\"", childrenIds) + '"' + "}";
 
-                var sql = $"SELECT ST_ZMin(ST_3DExtent({ geometry_column })), ST_ZMax(ST_3DExtent({ geometry_column })) FROM { geometry_table } WHERE tile_id=ANY (' { childrenIdsStr } ') ";
-                var cmd = new NpgsqlCommand(sql, conn);
-                var reader = cmd.ExecuteReader();
-                reader.Read();
-                var minZ = reader.IsDBNull(0) ? 0 : reader.GetDouble(0);
-                var maxZ = reader.IsDBNull(1) ? 0 : reader.GetDouble(1);
+                var minZ = double.MaxValue;
+                var maxZ = double.MinValue;
 
-                reader.Close();
+                foreach ( var id in childrenIds ) {
+
+                    var heights = leavesHeights[ id ];
+                    if ( heights.Item1 < minZ )
+                        minZ = heights.Item1;
+                    
+                    if ( heights.Item2 > maxZ )
+                        maxZ = heights.Item2;
+
+                }
 
                 var bvol = new BoundingBox3D(bb.XMin, bb.YMin, minZ, bb.XMax, bb.YMax, maxZ);
                 var bvolRotated = BoundingBoxCalculator.TranslateRotateX(bvol, Reverse(translation), Math.PI / 2);
 
                 if (t.Children != null) {
 
-                    CalculateBoundingBoxes(conn, translation, t.Children, geometry_table, geometry_column, epsg);
+                    CalculateBoundingBoxes(conn, translation, t.Children, leavesHeights, geometry_table, geometry_column, epsg);
 
                 }
                 t.Boundingvolume = TileCutter.GetBoundingvolume(bvolRotated);

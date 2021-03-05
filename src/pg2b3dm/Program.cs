@@ -72,6 +72,7 @@ namespace pg2b3dm
                 var LeavesTable = o.LeavesTable;
                 var idcolumn = o.IdColumn;
                 var lodcolumn = o.LodColumn;
+                var tileIdColumn = o.TileIDColumn;
                 var geometricErrors = Array.ConvertAll(o.GeometricErrors.Split(','), double.Parse); ;
 
                 var conn = new NpgsqlConnection(connectionString);
@@ -116,7 +117,7 @@ namespace pg2b3dm
                 var nrOfTiles = RecursiveTileCounter.CountTiles(tiles.tiles, 0);
                 Console.WriteLine($"tiles with features: {nrOfTiles} ");
                 conn.Open();
-                var leavesHeights = getLeavesHeights(conn, tiles.tiles, geometryTable, geometryColumn);
+                var leavesHeights = getLeavesHeights(conn, tiles.tiles, geometryTable, geometryColumn, tileIdColumn);
                 conn.Close();
                 CalculateBoundingBoxes(conn, translation, tiles.tiles, leavesHeights, geometryTable, geometryColumn, sr);
                 Console.WriteLine("writing tileset.json...");
@@ -137,13 +138,13 @@ namespace pg2b3dm
             var res = new double[] { translation[0] * -1, translation[1] * -1, translation[2] * -1 };
             return res;
         }
-        private static Dictionary<String, (double, double)> getLeavesHeights( NpgsqlConnection conn, List<Tile> tiles, string geometry_table, string geometry_column ) {
+        private static Dictionary<String, (double, double)> getLeavesHeights( NpgsqlConnection conn, List<Tile> tiles, string geometry_table, string geometry_column, string tileIdColumn="tile_id" ) {
 
             void calculateLeavesHeights( Tile t, Dictionary<String, (double, double)> heights  ) {
 
                 if ( t.Id != 0 ) {
 
-                    var sql = $"SELECT ST_ZMin(ST_3DExtent({ geometry_column })), ST_ZMax(ST_3DExtent({ geometry_column })) FROM { geometry_table } WHERE tile_id='{ t.Id }'";
+                    var sql = $"SELECT ST_ZMin(ST_3DExtent({ geometry_column })), ST_ZMax(ST_3DExtent({ geometry_column })) FROM { geometry_table } WHERE { tileIdColumn }='{ t.Id }'";
                     var cmd = new NpgsqlCommand(sql, conn);
                     var reader = cmd.ExecuteReader();
                     reader.Read();

@@ -67,7 +67,7 @@ namespace B3dm.Tileset
             return $"ST_RotateX(ST_Translate({ geometry_column}, { translation[0].ToString(CultureInfo.InvariantCulture)}*-1,{ translation[1].ToString(CultureInfo.InvariantCulture)}*-1 , { translation[2].ToString(CultureInfo.InvariantCulture)}*-1), -pi() / 2)";
         }
 
-        public static List<GeometryRecord> GetGeometrySubset(NpgsqlConnection conn, string geometry_table, string geometry_column, string idcolumn, double[] translation, Tile t, int epsg, string colorColumn = "", string attributesColumn = "", string lodColumn="")
+        public static List<GeometryRecord> GetGeometrySubset(NpgsqlConnection conn, string geometry_table, string geometry_column, string idcolumn, double[] translation, Tile t, int epsg, string colorColumn = "", string attributesColumn = "", string lodColumn="", string tileIdColumn="tile_id")
         {
             var geometries = new List<GeometryRecord>();
             var g = GetGeometryColumn(geometry_column, translation);
@@ -82,7 +82,7 @@ namespace B3dm.Tileset
             var sqlFrom = "FROM " + geometry_table;
 
             var lodQuery = LodQuery.GetLodQuery(lodColumn, t.Lod);
-            var sqlWhere = $" WHERE tile_id='{t.Id}'";
+            var sqlWhere = $" WHERE { tileIdColumn }='{ t.Id }'";
 
             var sql = sqlselect + sqlFrom + sqlWhere;
 

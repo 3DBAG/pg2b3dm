@@ -52,8 +52,8 @@ namespace pg2b3dm
         [Option("compression", Required = false, Default = "", HelpText = "Tiles compression type (gzip)")]
         public string Compression { get; set; }
 
-        // [Option("password", Required = false, Default = "", HelpText = "password")]
-        // public string PgPass { get; set; }
+        [Option("passfile", Required = false, Default = "", HelpText = "Psql passfile path (.pgpass)")]
+        public string PassFile { get; set; }
 
         [Option("tileidcolumn", Required = false, Default = "", HelpText = "Tile ID column")]
         public string TileIDColumn { get; set; }

@@ -30,11 +30,10 @@ namespace pg2b3dm
                 o.User = string.IsNullOrEmpty(o.User) ? Environment.UserName : o.User;
                 o.Database = string.IsNullOrEmpty(o.Database) ? Environment.UserName : o.Database;
 
-                // var connectionString = $"Host={o.Host};Username={o.User};Database={o.Database};Port={o.Port};Pooling=True;Command Timeout=120;Passfile={o.PgPass}";
-                var connectionString = $"Host={o.Host};Username={o.User};Database={o.Database};Port={o.Port};Pooling=True;Command Timeout=1000";
+                var connectionString = $"Host={o.Host};Username={o.User};Database={o.Database};Port={o.Port};Pooling=True;Command Timeout=120;passfile={o.PassFile}";
                 var istrusted = TrustedConnectionChecker.HasTrustedConnection(connectionString);
 
-                if (!istrusted) {
+                if (!istrusted && o.PassFile == "") {
                     Console.Write($"password for user {o.User}: ");
                     password = PasswordAsker.GetPassword();
                     connectionString += $";password={password}";

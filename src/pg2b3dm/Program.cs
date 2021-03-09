@@ -30,7 +30,7 @@ namespace pg2b3dm
                 o.User = string.IsNullOrEmpty(o.User) ? Environment.UserName : o.User;
                 o.Database = string.IsNullOrEmpty(o.Database) ? Environment.UserName : o.Database;
 
-                var connectionString = $"Host={o.Host};Username={o.User};Database={o.Database};Port={o.Port};Pooling=True;Command Timeout=120;passfile={o.PassFile}";
+                var connectionString = $"Host={o.Host};Username={o.User};Database={o.Database};Port={o.Port};Pooling=True;Command Timeout=300;passfile={o.PassFile}";
                 var istrusted = TrustedConnectionChecker.HasTrustedConnection(connectionString);
 
                 if (!istrusted && o.PassFile == "") {
@@ -110,15 +110,15 @@ namespace pg2b3dm
                 var box = boundingboxAllFeatures.GetBox();
                 var sr = SpatialReferenceRepository.GetSpatialReference(conn, geometryTable, geometryColumn);
                 Console.WriteLine($"spatial reference: {sr}");
-                Console.WriteLine("reading quadtree...");
+                Console.WriteLine($"reading quadtree...");
                 var tiles = TileCutter.GetTiles(0, conn, o.ExtentTile, geometryTable, geometryColumn, bbox3d, sr, 0, lods, geometricErrors.Skip(1).ToArray(), QuadtreeTable, LeavesTable, lodcolumn);
                 Console.WriteLine();
-                var nrOfTiles = RecursiveTileCounter.CountTiles(tiles.tiles, 0);
-                Console.WriteLine($"tiles with features: {nrOfTiles} ");
                 conn.Open();
                 var leavesHeights = getLeavesHeights(conn, tiles.tiles, geometryTable, geometryColumn, tileIdColumn);
                 conn.Close();
                 CalculateBoundingBoxes(conn, translation, tiles.tiles, leavesHeights, geometryTable, geometryColumn, sr);
+                var nrOfTiles = RecursiveTileCounter.CountTiles(tiles.tiles, 0);
+                Console.WriteLine($"tiles with features: {nrOfTiles} ");
                 Console.WriteLine("writing tileset.json...");
                 var json = TreeSerializer.ToJson(tiles.tiles, translation, box, geometricErrors[0], o.Refinement);
                 File.WriteAllText($"{o.Output}/tileset.json", json);
@@ -232,11 +232,12 @@ namespace pg2b3dm
 
             object counterLock = new object();
             counter = 0;    
+            var tilesInProgress = new HashSet<Int32>();
 
             var options = new ParallelOptions();
             options.MaxDegreeOfParallelism = MaxThreads;
 
-            var pb = new Konsole.ProgressBar(Konsole.PbStyle.SingleLine, maxcount);
+            var pb = new Konsole.ProgressBar(Konsole.PbStyle.DoubleLine, maxcount);
             pb.Refresh(counter, "Starting...");
 
             Parallel.For(0, tiles.Count,
@@ -248,18 +249,29 @@ namespace pg2b3dm
             },
             (int c, ParallelLoopState state, NpgsqlConnection new_conn) => {
                 var t = tiles[c];
+                var perc = 0.0;
+                var tilesInProgressStr = "";
                 lock (counterLock)
                 {
                     counter++;
-                    var perc = Math.Round(((double)counter / maxcount) * 100, 2);
-                    pb.Refresh(counter, $"{counter}/{maxcount} - {perc:F}%");
+                    perc = Math.Round(((double)counter / maxcount) * 100, 2);
+                    tilesInProgressStr = String.Join(", ", tilesInProgress);
+                    pb.Refresh(counter, $"{counter}/{maxcount} - {perc:F}%, tile IDs in progress: {tilesInProgressStr}");
                 }
 
-                var filename = $"{outputPath}/tiles/{t.Id}.b3dm";
+                var compressionExtension = "";
+                if ( compressionType == "gzip" )
+                    compressionExtension = ".gz";
+                var filename = $"{outputPath}/tiles/{t.Id}.b3dm" + compressionExtension;
+                
                 if (SkipTiles && File.Exists(filename))
                 {
                     return new_conn;
                 }
+
+                tilesInProgress.Add(t.Id);
+                tilesInProgressStr = String.Join(", ", tilesInProgress);
+                pb.Refresh(counter, $"{counter}/{maxcount} - {perc:F}%, tile IDs in progress: {tilesInProgressStr}");
 
                 var geometries = BoundingBoxRepository.GetGeometrySubset(new_conn, geometryTable, geometryColumn, idcolumn, translation, t, epsg, colorColumn, attributesColumn, lodColumn);
 
@@ -277,7 +289,7 @@ namespace pg2b3dm
                 }
                 else if (compressionType == "gzip")
                 {
-                    using (FileStream fileToCompress = File.Create(filename + ".gz")) 
+                    using (FileStream fileToCompress = File.Create(filename)) 
                     {
                         using (GZipStream compressionStream = new GZipStream(fileToCompress, CompressionMode.Compress)) 
                         {
@@ -285,6 +297,8 @@ namespace pg2b3dm
                         }
                     }
                 }
+
+                tilesInProgress.Remove(t.Id);
 
                 if (t.Children != null) {
                     counter = WriteTiles(connectionString, geometryTable, geometryColumn, idcolumn, translation, t.Children, epsg, outputPath, counter, maxcount, colorColumn, attributesColumn, lodColumn, SkipTiles);

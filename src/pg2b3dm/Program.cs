@@ -24,7 +24,7 @@ namespace pg2b3dm
         static void Main(string[] args)
         {
             var version = Assembly.GetEntryAssembly().GetName().Version;
-            Console.WriteLine($"tool: pg2b3dm {version}");
+            Console.WriteLine($"tool: pg2b3dm (tudelft3d fork) {version}");
 
             Parser.Default.ParseArguments<Options>(args).WithParsed(o => {
                 o.User = string.IsNullOrEmpty(o.User) ? Environment.UserName : o.User;
@@ -232,12 +232,11 @@ namespace pg2b3dm
 
             object counterLock = new object();
             counter = 0;    
-            var tilesInProgress = new HashSet<Int32>();
 
             var options = new ParallelOptions();
             options.MaxDegreeOfParallelism = MaxThreads;
 
-            var pb = new Konsole.ProgressBar(Konsole.PbStyle.DoubleLine, maxcount);
+            var pb = new Konsole.ProgressBar(Konsole.PbStyle.SingleLine, maxcount);
             pb.Refresh(counter, "Starting...");
 
             Parallel.For(0, tiles.Count,
@@ -249,14 +248,11 @@ namespace pg2b3dm
             },
             (int c, ParallelLoopState state, NpgsqlConnection new_conn) => {
                 var t = tiles[c];
-                var perc = 0.0;
-                var tilesInProgressStr = "";
                 lock (counterLock)
                 {
                     counter++;
-                    perc = Math.Round(((double)counter / maxcount) * 100, 2);
-                    tilesInProgressStr = String.Join(", ", tilesInProgress);
-                    pb.Refresh(counter, $"{counter}/{maxcount} - {perc:F}%, tile IDs in progress: {tilesInProgressStr}");
+                    var perc = Math.Round(((double)counter / maxcount) * 100, 2);
+                    pb.Refresh(counter, $"{counter}/{maxcount} - {perc:F}%");
                 }
 
                 var compressionExtension = "";
@@ -268,10 +264,6 @@ namespace pg2b3dm
                 {
                     return new_conn;
                 }
-
-                tilesInProgress.Add(t.Id);
-                tilesInProgressStr = String.Join(", ", tilesInProgress);
-                pb.Refresh(counter, $"{counter}/{maxcount} - {perc:F}%, tile IDs in progress: {tilesInProgressStr}");
 
                 var geometries = BoundingBoxRepository.GetGeometrySubset(new_conn, geometryTable, geometryColumn, idcolumn, translation, t, epsg, colorColumn, attributesColumn, lodColumn);
 
@@ -297,8 +289,6 @@ namespace pg2b3dm
                         }
                     }
                 }
-
-                tilesInProgress.Remove(t.Id);
 
                 if (t.Children != null) {
                     counter = WriteTiles(connectionString, geometryTable, geometryColumn, idcolumn, translation, t.Children, epsg, outputPath, counter, maxcount, colorColumn, attributesColumn, lodColumn, SkipTiles);

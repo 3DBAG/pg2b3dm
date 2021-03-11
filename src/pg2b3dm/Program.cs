@@ -123,7 +123,7 @@ namespace pg2b3dm
                 var json = TreeSerializer.ToJson(tiles.tiles, translation, box, geometricErrors[0], o.Refinement);
                 File.WriteAllText($"{o.Output}/tileset.json", json);
 
-                WriteTiles(connectionString, geometryTable, geometryColumn, idcolumn, translation, tiles.leaves, sr, o.Output, 0, nrOfTiles, o.RoofColorColumn, o.AttributesColumn, o.LodColumn, o.SkipTiles, o.MaxThreads, o.Compression);
+                WriteTiles(connectionString, geometryTable, geometryColumn, idcolumn, translation, tiles.leaves, sr, o.Output, 0, nrOfTiles, o.skipHugeTiles, o.RoofColorColumn, o.AttributesColumn, o.LodColumn, o.SkipTiles, o.MaxThreads, o.Compression);
 
                 stopWatch.Stop();
                 Console.WriteLine();
@@ -226,7 +226,7 @@ namespace pg2b3dm
 
         }
 
-        private static int WriteTiles(string connectionString, string geometryTable, string geometryColumn, string idcolumn, double[] translation, List<Tile> tiles, int epsg, string outputPath, int counter, int maxcount, string colorColumn = "", string attributesColumn = "", string lodColumn="", bool SkipTiles=false, int MaxThreads=-1, string compressionType="")
+        private static int WriteTiles(string connectionString, string geometryTable, string geometryColumn, string idcolumn, double[] translation, List<Tile> tiles, int epsg, string outputPath, int counter, int maxcount, int skipHugeTiles, string colorColumn = "", string attributesColumn = "", string lodColumn="", bool SkipTiles=false, int MaxThreads=-1, string compressionType="")
         
         {
 
@@ -238,6 +238,8 @@ namespace pg2b3dm
 
             var pb = new Konsole.ProgressBar(Konsole.PbStyle.SingleLine, maxcount);
             pb.Refresh(counter, "Starting...");
+
+            var skippedTiles = new List<string>();
 
             Parallel.For(0, tiles.Count,
             options,
@@ -269,6 +271,12 @@ namespace pg2b3dm
 
                 var triangleCollection = GetTriangles(geometries);
 
+                if ( skipHugeTiles != 0 && triangleCollection.Count > skipHugeTiles ) {
+                    System.Console.WriteLine("Tile {0} has {1} triangles and is skipped", t.Id, triangleCollection.Count);
+                    skippedTiles.Add(t.Id.ToString());
+                    return new_conn;
+                }
+
                 var attributes = GetAttributes(geometries);
 
                 var b3dm = B3dmCreator.GetB3dm(attributesColumn, attributes, triangleCollection);
@@ -291,7 +299,7 @@ namespace pg2b3dm
                 }
 
                 if (t.Children != null) {
-                    counter = WriteTiles(connectionString, geometryTable, geometryColumn, idcolumn, translation, t.Children, epsg, outputPath, counter, maxcount, colorColumn, attributesColumn, lodColumn, SkipTiles);
+                    counter = WriteTiles(connectionString, geometryTable, geometryColumn, idcolumn, translation, t.Children, epsg, outputPath, counter, maxcount, skipHugeTiles, colorColumn, attributesColumn, lodColumn, SkipTiles, MaxThreads, compressionType);
                 }
 
                 return new_conn;
@@ -299,7 +307,14 @@ namespace pg2b3dm
             (NpgsqlConnection new_conn) => {
                 new_conn.Close();
             }); 
+
+            File.WriteAllLines(outputPath + "/skippedtiles.txt", skippedTiles);
+
             Console.WriteLine("Aaaand... done!");
+            if ( skippedTiles.Count > 0 ) {
+                System.Console.WriteLine("Some tiles have been skipped because they were too big. See \"skippedtiles.txt\".");
+            }
+
             return counter;
         }
 

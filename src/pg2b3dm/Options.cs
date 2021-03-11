@@ -57,5 +57,8 @@ namespace pg2b3dm
 
         [Option("tileidcolumn", Required = false, Default = "tile_id", HelpText = "Tile ID column")]
         public string TileIDColumn { get; set; }
+
+        [Option("skiptilesntriangles", Required = false, Default = 0, HelpText = "Skip tiles with more than n triangles")]
+        public int skipHugeTiles { get; set; }
     }
 }

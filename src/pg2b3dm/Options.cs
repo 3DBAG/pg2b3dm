@@ -55,7 +55,7 @@ namespace pg2b3dm
         [Option("passfile", Required = false, Default = "", HelpText = "Psql passfile path (.pgpass)")]
         public string PassFile { get; set; }
 
-        [Option("tileidcolumn", Required = false, Default = "", HelpText = "Tile ID column")]
+        [Option("tileidcolumn", Required = false, Default = "tile_id", HelpText = "Tile ID column")]
         public string TileIDColumn { get; set; }
     }
 }

@@ -16,7 +16,7 @@ namespace Wkb2Gltf
             var default_hex_color = "#bb3333";
             var defaultMaterial = materialCache.GetMaterialBuilderByColor(default_hex_color);
 
-            var mesh = new MeshBuilder<VertexPositionNormal, VertexWithBatchId, VertexEmpty>("mesh");
+            var mesh = new MeshBuilder<VertexPosition, VertexWithBatchId, VertexEmpty>("mesh");
 
             foreach (var triangle in triangles) {
                 MaterialBuilder material;
@@ -38,12 +38,11 @@ namespace Wkb2Gltf
         }
 
 
-        private static bool DrawTriangle(Triangle triangle, MaterialBuilder material, MeshBuilder<VertexPositionNormal, VertexWithBatchId, VertexEmpty> mesh)
+        private static bool DrawTriangle(Triangle triangle, MaterialBuilder material, MeshBuilder<VertexPosition, VertexWithBatchId, VertexEmpty> mesh)
         {
-            var normal = triangle.GetNormal();
             var prim = mesh.UsePrimitive(material);
             var vectors = triangle.ToVectors();
-            var indices = prim.AddTriangleWithBatchId(vectors, normal, triangle.GetBatchId());
+            var indices = prim.AddTriangleWithBatchId(vectors, triangle.GetBatchId());
             return indices.Item1 > 0;
         }
     }

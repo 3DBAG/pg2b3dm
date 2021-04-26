@@ -46,5 +46,8 @@ namespace pg2b3dm
 
         [Option("compress", Required = false, Default = null, HelpText = "Compress glb data")]
         public bool Compress { get; set; }
+
+        [Option("filecompression", Required = false, Default = "", HelpText = "Compress complete files (gzip)")]
+        public string FileCompression { get; set; }
     }
 }

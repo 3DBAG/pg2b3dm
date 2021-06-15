@@ -3,7 +3,7 @@
  Version 1.2 has multithreading, the use of a custom quadtree (stored in a database) and gzip compression.
  
  Example command:
- `dotnet run -- -U jliempt -d baseregisters -t 'bag3d_v21020.export_3dtiles_lod22' -p 5432 -c 'geometrie' -i 'fid' -a 'attributes' --qttable tiles.xyz_tiles --leavestable tiles.bag_tiles_3k --tileidcolumn tile_id --skiptilesntriangles 3500000 --passfile /home/jliempt/.pgpass --maxthreads 40 --compression gzip -o 21020_lod22`
+ `dotnet run -- -U jliempt -d baseregisters -t 'bag3d_v21020.export_3dtiles_lod22' -p 5432 -c 'geometrie' -i 'fid' -a 'attributes' --qttable tiles.xyz_tiles --leavestable tiles.bag_tiles_3k --tileidcolumn tile_id --skiptilesntriangles 3500000 --passfile /home/jliempt/.pgpass --maxthreads 40 --compression gzip --disableprogressbar -o 21020_lod22`
  
  
 

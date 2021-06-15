@@ -60,5 +60,8 @@ namespace pg2b3dm
 
         [Option("skiptilesntriangles", Required = false, Default = 0, HelpText = "Skip tiles with more than n triangles")]
         public int skipHugeTiles { get; set; }
+
+        [Option("disableprogressbar", Default = false, HelpText = "Disable the progress bar")]
+        public bool DisablePb { get; set; }
     }
 }

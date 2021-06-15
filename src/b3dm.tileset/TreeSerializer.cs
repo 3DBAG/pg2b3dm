@@ -9,7 +9,7 @@ namespace B3dm.Tileset
         public static string ToJson(List<Tile> tiles, double[] transform, double[] box, double maxGeometricError, string refinement)
         {
             var tileset = ToTileset(tiles, transform, box, maxGeometricError, refinement);
-            var json = JsonConvert.SerializeObject(tileset, Formatting.Indented, new JsonSerializerSettings() { NullValueHandling = NullValueHandling.Ignore });
+            var json = JsonConvert.SerializeObject(tileset, new JsonSerializerSettings() { NullValueHandling = NullValueHandling.Ignore });
             return json; ;
         }
 

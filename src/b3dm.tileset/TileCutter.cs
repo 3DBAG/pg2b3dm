@@ -27,7 +27,7 @@ namespace B3dm.Tileset
             return bytes;
         }
 
-        public static (int tileId, List<Tile> tiles, List<Tile> leaves) GetTiles(int tileId, NpgsqlConnection conn, double extentTile, string geometryTable, string geometryColumn, BoundingBox3D box3d, int epsg, int currentLod, List<int> lods, double[] geometricErrors, string quadtree_table, string leaves_table, string lodcolumn = "")
+        public static (int tileId, List<Tile> tiles, List<Tile> leaves) GetTiles(int tileId, NpgsqlConnection conn, double extentTile, string geometryTable, string geometryColumn, BoundingBox3D box3d, int epsg, int currentLod, List<int> lods, double[] geometricErrors, string quadtree_table, string leaves_table, string tileIdColumn, string lodcolumn = "")
         {
             // "tiles" to create the tileset with, "leaves" to give to the "writeTiles" function (this flat list helps for multithreading).
             var tiles = new List<Tile>();
@@ -41,7 +41,7 @@ namespace B3dm.Tileset
             var error = 500;
 
             var sql1 = $"SELECT MAX(z) FROM {quadtree_table};";
-            var sql2 = $"SELECT f.*, l.tile_id AS b3dm_id, ST_AsBinary(l.tile_polygon) AS leaf_geom FROM {quadtree_table} AS f, {leaves_table} AS l WHERE ST_Intersects(l.tile_polygon, f.geom) AND (ST_Equals(l.tile_polygon, f.geom))";
+            var sql2 = $"SELECT f.pid, f.id, l.tile_id AS b3dm_id, ST_AsBinary(l.tile_polygon) AS leaf_geom, b.min AS min, b.max AS max FROM {quadtree_table} AS f, {leaves_table} AS l INNER JOIN ( SELECT tile_id, ST_Xmin(bbox) as bbox, ST_AsBinary(ST_MakePoint(ST_XMin(bbox), ST_YMin(bbox), ST_ZMin(bbox))) as min, ST_AsBinary(ST_MakePoint(ST_XMax(bbox), ST_YMax(bbox), ST_ZMax(bbox))) as max FROM (SELECT tile_id, ST_3DExtent({geometryColumn}) as bbox FROM {geometryTable} GROUP BY {tileIdColumn}) as bbox ) AS b ON (l.{tileIdColumn} = b.{tileIdColumn}) WHERE ST_Intersects(l.tile_polygon, f.geom) AND (ST_Equals(l.tile_polygon, f.geom))";
             conn.Open();
             var cmd = new NpgsqlCommand(sql1, conn);
             var reader = cmd.ExecuteReader();
@@ -64,8 +64,13 @@ namespace B3dm.Tileset
 
                 var parent_id = reader.GetString(0);
                 var node_id = reader.GetString(1);
-                var b3dm_id = reader.GetString(6);
-                var geom_stream = reader.GetStream(7);
+                var b3dm_id = reader.GetString(2);
+                var min_stream = reader.GetStream(4);
+                var min = Geometry.Deserialize<WkbSerializer>(min_stream).GetCenter();
+                min_stream.Close();
+                var max_stream = reader.GetStream(5);
+                var max = Geometry.Deserialize<WkbSerializer>(max_stream).GetCenter();
+                max_stream.Close();
                 
                 string[] parent_ids = parent_id.Split('-');
                 List<string> p_ids = new List<string>(parent_ids);
@@ -84,12 +89,7 @@ namespace B3dm.Tileset
 
                 }
 
-                var leaf_geom = Geometry.Deserialize<WkbSerializer>(geom_stream);
-                var bbox = leaf_geom.GetBoundingBox();
-                var from = new Point(bbox.XMin, bbox.YMin);
-                var to = new Point(bbox.XMax, bbox.YMax);
-
-                var tile = new Tile(Int32.Parse(b3dm_id), new BoundingBox((double)from.X, (double)from.Y, (double)to.X, (double)to.Y)) {
+                var tile = new Tile(Int32.Parse(b3dm_id), new BoundingBox3D(min.X.Value, min.Y.Value, min.Z.Value, max.X.Value, max.Y.Value, max.Z.Value)) {
                     Lod = 0,
                     GeometricError = error
                 };
@@ -108,21 +108,15 @@ namespace B3dm.Tileset
                 List<string> keys = new List<string>(level.Keys);
                 string keys_str = string.Format("'{0}'", string.Join("','", keys));
 
-                var sql3 = $"SELECT id, pid, ST_AsBinary(geom) FROM {quadtree_table} WHERE id in ({keys_str})";
+                var sql3 = $"SELECT id, pid FROM {quadtree_table} WHERE id in ({keys_str})";
                 cmd = new NpgsqlCommand(sql3, conn);
                 reader = cmd.ExecuteReader();
                 while ( reader.Read() ) {
 
                     var id = reader.GetString(0);
                     var pid = reader.GetString(1);
-                    var geom_stream = reader.GetStream(2);
-                    var node_geom = Geometry.Deserialize<WkbSerializer>(geom_stream);
 
-                    var bbox = node_geom.GetBoundingBox();
-                    var from = new Point(bbox.XMin, bbox.YMin);
-                    var to = new Point(bbox.XMax, bbox.YMax);
-
-                    var tile = new Tile(0, new BoundingBox((double)from.X, (double)from.Y, (double)to.X, (double)to.Y)) {
+                    var tile = new Tile(0, new BoundingBox3D(0.0, 0.0, 0.0, 0.0, 0.0, 0.0)) {
                         Lod = 0,
                         GeometricError = error,
                         Children = new List<Tile>()

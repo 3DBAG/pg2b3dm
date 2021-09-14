@@ -7,9 +7,9 @@ namespace B3dm.Tileset
     public class Tile
     {
         private int id;
-        private BoundingBox bb;
+        private BoundingBox3D bb;
 
-        public Tile(int id, BoundingBox bb)
+        public Tile(int id, BoundingBox3D bb)
         {
             this.id = id;
             this.bb = bb;
@@ -19,8 +19,9 @@ namespace B3dm.Tileset
             get { return id; }
         }
 
-        public BoundingBox BoundingBox {
+        public BoundingBox3D BoundingBox {
             get { return bb; }
+            set { this.bb = value; }
         }
 
 

@@ -105,17 +105,20 @@ namespace pg2b3dm
                 
                 Console.WriteLine($"3D Boundingbox {geometryTable}.{geometryColumn}: [{bbox3d.XMin}, {bbox3d.YMin}, {bbox3d.ZMin},{bbox3d.XMax},{bbox3d.YMax}, {bbox3d.ZMax}]");
                 var translation = bbox3d.GetCenter().ToVector();
-               //  Console.WriteLine($"translation {geometryTable}.{geometryColumn}: [{string.Join(',', translation) }]");
+                //  Console.WriteLine($"translation {geometryTable}.{geometryColumn}: [{string.Join(',', translation) }]");
                 var boundingboxAllFeatures = BoundingBoxCalculator.TranslateRotateX(bbox3d, Reverse(translation), Math.PI / 2);
                 var box = boundingboxAllFeatures.GetBox();
+
+                // Increase root boundingVolume by the Z-transform, but don't use transform for tiles
+                box[11] += translation[2];
+                translation[2] = 0;
+
                 var sr = SpatialReferenceRepository.GetSpatialReference(conn, geometryTable, geometryColumn);
                 Console.WriteLine($"spatial reference: {sr}");
                 Console.WriteLine($"reading quadtree...");
-                var tiles = TileCutter.GetTiles(0, conn, o.ExtentTile, geometryTable, geometryColumn, bbox3d, sr, 0, lods, geometricErrors.Skip(1).ToArray(), QuadtreeTable, LeavesTable, lodcolumn);
+                var tiles = TileCutter.GetTiles(0, conn, o.ExtentTile, geometryTable, geometryColumn, bbox3d, sr, 0, lods, geometricErrors.Skip(1).ToArray(), QuadtreeTable, LeavesTable, tileIdColumn, lodcolumn);
                 Console.WriteLine();
-                conn.Open();
-                var leavesHeights = getLeavesHeights(conn, tiles.tiles, geometryTable, geometryColumn, tileIdColumn);
-                conn.Close();
+                var leavesHeights = new Dictionary<String, (double, double)>();
                 CalculateBoundingBoxes(conn, translation, tiles.tiles, leavesHeights, geometryTable, geometryColumn, sr);
                 var nrOfTiles = RecursiveTileCounter.CountTiles(tiles.tiles, 0);
                 Console.WriteLine($"tiles with features: {nrOfTiles} ");
@@ -178,15 +181,31 @@ namespace pg2b3dm
         private static void CalculateBoundingBoxes(NpgsqlConnection conn, double[] translation, List<Tile> tiles, Dictionary<String, (double, double)> leavesHeights, string geometry_table, string geometry_column, int epsg)
         {
 
-            void getChildrenTileIDs( Tile t, List<string> ids ) {
+            void getChildrenTileIDs( Tile t, BoundingBox3D bbox ) {
 
-                if ( t.Id != 0 ) {
-                    ids.Add( t.Id.ToString() );
+                if (t.BoundingBox.XMin < bbox.XMin) {
+                    bbox.XMin = t.BoundingBox.XMin;
+                }
+                if (t.BoundingBox.YMin < bbox.YMin) {
+                    bbox.YMin = t.BoundingBox.YMin;
+                }
+                if (t.BoundingBox.ZMin < bbox.ZMin) {
+                    bbox.ZMin = t.BoundingBox.ZMin;
+                }
+                if (t.BoundingBox.XMax > bbox.XMax) {
+                    bbox.XMax = t.BoundingBox.XMax;
+                }
+                if (t.BoundingBox.YMax > bbox.YMax) {
+                    bbox.YMax = t.BoundingBox.YMax;
+                }
+                if (t.BoundingBox.ZMax > bbox.ZMax) {
+                    bbox.ZMax = t.BoundingBox.ZMax;
                 }
 
                 if ( t.Children != null ) {
                     foreach ( var c in t.Children ) {
-                        getChildrenTileIDs( c, ids );
+
+                        getChildrenTileIDs( c, bbox );
                     }
                 }
 
@@ -197,24 +216,13 @@ namespace pg2b3dm
                 var bb = t.BoundingBox;
                 var tid = t.Id;
                 var childrenIds = new List<string>();
-                getChildrenTileIDs( t, childrenIds );
 
-                var minZ = double.MaxValue;
-                var maxZ = double.MinValue;
+                var bbox = new BoundingBox3D(double.MaxValue, double.MaxValue, double.MaxValue, double.MinValue, double.MinValue, double.MinValue);
 
-                foreach ( var id in childrenIds ) {
+                getChildrenTileIDs( t, bbox );
 
-                    var heights = leavesHeights[ id ];
-                    if ( heights.Item1 < minZ )
-                        minZ = heights.Item1;
-                    
-                    if ( heights.Item2 > maxZ )
-                        maxZ = heights.Item2;
-
-                }
-
-                var bvol = new BoundingBox3D(bb.XMin, bb.YMin, minZ, bb.XMax, bb.YMax, maxZ);
-                var bvolRotated = BoundingBoxCalculator.TranslateRotateX(bvol, Reverse(translation), Math.PI / 2);
+                t.BoundingBox = bbox;
+                var bvolRotated = BoundingBoxCalculator.TranslateRotateX(t.BoundingBox, Reverse(translation), Math.PI / 2);
 
                 if (t.Children != null) {
 
@@ -270,7 +278,6 @@ namespace pg2b3dm
                 if ( compressionType == "gzip" )
                     compressionExtension = ".gz";
                 var filename = $"{outputPath}/tiles/{t.Id}.b3dm" + compressionExtension;
-                
                 if (SkipTiles && File.Exists(filename))
                 {
                     return new_conn;

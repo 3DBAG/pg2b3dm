@@ -181,31 +181,38 @@ namespace pg2b3dm
         private static void CalculateBoundingBoxes(NpgsqlConnection conn, double[] translation, List<Tile> tiles, Dictionary<String, (double, double)> leavesHeights, string geometry_table, string geometry_column, int epsg)
         {
 
-            void getChildrenTileIDs( Tile t, BoundingBox3D bbox ) {
+            void getChildrenExtent( Tile t, BoundingBox3D bbox ) {
 
-                if (t.BoundingBox.XMin < bbox.XMin) {
-                    bbox.XMin = t.BoundingBox.XMin;
+                // Only leafs, since nodes might not yet have a proper bbox
+                if ( t.Id != 0 ) {
+
+                    if (t.BoundingBox.XMin < bbox.XMin) {
+                        bbox.XMin = t.BoundingBox.XMin;
+                    }
+                    if (t.BoundingBox.YMin < bbox.YMin) {
+                        bbox.YMin = t.BoundingBox.YMin;
+                    }
+                    if (t.BoundingBox.ZMin < bbox.ZMin) {
+                        bbox.ZMin = t.BoundingBox.ZMin;
+                    }
+                    if (t.BoundingBox.XMax > bbox.XMax) {
+                        bbox.XMax = t.BoundingBox.XMax;
+                    }
+                    if (t.BoundingBox.YMax > bbox.YMax) {
+                        bbox.YMax = t.BoundingBox.YMax;
+                    }
+                    if (t.BoundingBox.ZMax > bbox.ZMax) {
+                        bbox.ZMax = t.BoundingBox.ZMax;
+                    }
+
                 }
-                if (t.BoundingBox.YMin < bbox.YMin) {
-                    bbox.YMin = t.BoundingBox.YMin;
-                }
-                if (t.BoundingBox.ZMin < bbox.ZMin) {
-                    bbox.ZMin = t.BoundingBox.ZMin;
-                }
-                if (t.BoundingBox.XMax > bbox.XMax) {
-                    bbox.XMax = t.BoundingBox.XMax;
-                }
-                if (t.BoundingBox.YMax > bbox.YMax) {
-                    bbox.YMax = t.BoundingBox.YMax;
-                }
-                if (t.BoundingBox.ZMax > bbox.ZMax) {
-                    bbox.ZMax = t.BoundingBox.ZMax;
-                }
+
+
 
                 if ( t.Children != null ) {
                     foreach ( var c in t.Children ) {
 
-                        getChildrenTileIDs( c, bbox );
+                        getChildrenExtent( c, bbox );
                     }
                 }
 
@@ -219,7 +226,7 @@ namespace pg2b3dm
 
                 var bbox = new BoundingBox3D(double.MaxValue, double.MaxValue, double.MaxValue, double.MinValue, double.MinValue, double.MinValue);
 
-                getChildrenTileIDs( t, bbox );
+                getChildrenExtent( t, bbox );
 
                 t.BoundingBox = bbox;
                 var bvolRotated = BoundingBoxCalculator.TranslateRotateX(t.BoundingBox, Reverse(translation), Math.PI / 2);

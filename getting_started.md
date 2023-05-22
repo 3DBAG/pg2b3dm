@@ -125,10 +125,9 @@ Run bertt/tesselate_building. It does the following:
 
 - writes geometries to column geom_triangle (as polyhedralsurface geometries);
 
-- writes colors info (color code per triangle) into colors column;
+- writes shaders info (color code per triangle) into shaders column;
 
-- format option -f mapbox/cesium: in the next sample the default output format is used: '-f mapbox'. 
-When building for Cesium use '-f cesium'. 
+
 
 ```bash
 docker run -it --name tessellation --network mynetwork bertt/tesselate_building -h some-postgis -U postgres -d postgres -f cesium -t delaware_buildings -i wkb_geometry -o geom_triangle --idcolumn ogc_fid --stylecolumn style --shaderscolumn shaders
@@ -142,28 +141,11 @@ Run pg2b3dm, the program will make a connection to the database and 1 tileset.js
 docker run -v $(pwd)/output:/app/output -it --network mynetwork geodan/pg2b3dm -h some-postgis -U postgres -c geom_triangle -t delaware_buildings -d postgres -a id,height --shaderscolumn shaders
 ```
 
-## Visualize in MapBox
-
-Required: Use -f mapbox (default option) in previous step bertt/tesselate_building.
-
-Copy the generated tiles to sample_data\delaware\mapbox\ (overwrite the tileset.json and sample tiles in tiles directory there).
-
-Put folder 'sample_data' on a webserver (for example https://caddyserver.com/) and navigate to /delaware/mapbox/index.html
-
-If all goes well in Delaware - Dover you can find some 3D Tiles buildings.
-
-![alt text](delaware_mapbox.png "Delaware MapBox")
-
-Sample live demo in MapBox GL JS: https://geodan.github.io/pg2b3dm/sample_data/delaware/mapbox/
-
-
 ## Visualize in Cesium
-
-Required: Use -f cesium in previous step bertt/tesselate_building.
 
 Copy the generated tiles to sample_data\delaware\cesium\ (overwrite the tileset.json and sample tiles in tiles directory there).
 
-Put folder 'sample_data' on a webserver (for example https://caddyserver.com/) and navigate to /delaware/cesium/index.html
+Put folder 'sample_data' on a webserver (for example $ python3 -m http.server) and navigate to /delaware/cesium/index.html
 
 If all goes well in Delaware - Dover you can find some 3D Tiles buildings.
 

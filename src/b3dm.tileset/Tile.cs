@@ -6,16 +6,16 @@ namespace B3dm.Tileset
 {
     public class Tile
     {
-        private int id;
+        private string id;
         private BoundingBox3D bb;
 
-        public Tile(int id, BoundingBox3D bb)
+        public Tile(string id, BoundingBox3D bb)
         {
             this.id = id;
             this.bb = bb;
         }
 
-        public int Id {
+        public string Id {
             get { return id; }
         }
 

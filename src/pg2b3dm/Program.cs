@@ -68,7 +68,6 @@ namespace pg2b3dm
                 var geometryTable = o.GeometryTable;
                 var geometryColumn = o.GeometryColumn;
                 var QuadtreeTable = o.QuadtreeTable;
-                var LeavesTable = o.LeavesTable;
                 var idcolumn = o.IdColumn;
                 var lodcolumn = o.LodColumn;
                 var tileIdColumn = o.TileIDColumn;
@@ -116,7 +115,7 @@ namespace pg2b3dm
                 var sr = SpatialReferenceRepository.GetSpatialReference(conn, geometryTable, geometryColumn);
                 Console.WriteLine($"spatial reference: {sr}");
                 Console.WriteLine($"reading quadtree...");
-                var tiles = TileCutter.GetTiles(0, conn, o.ExtentTile, geometryTable, geometryColumn, bbox3d, sr, 0, lods, geometricErrors.Skip(1).ToArray(), QuadtreeTable, LeavesTable, tileIdColumn, lodcolumn);
+                var tiles = TileCutter.GetTiles(0, conn, o.ExtentTile, geometryTable, geometryColumn, bbox3d, sr, 0, lods, geometricErrors.Skip(1).ToArray(), QuadtreeTable, tileIdColumn, lodcolumn);
                 Console.WriteLine();
                 var leavesHeights = new Dictionary<String, (double, double)>();
                 CalculateBoundingBoxes(conn, translation, tiles.tiles, leavesHeights, geometryTable, geometryColumn, sr);
@@ -144,7 +143,7 @@ namespace pg2b3dm
 
             void calculateLeavesHeights( Tile t, Dictionary<String, (double, double)> heights  ) {
 
-                if ( t.Id != 0 ) {
+                if ( !string.IsNullOrEmpty(t.Id) ) {
 
                     var sql = $"SELECT ST_ZMin(ST_3DExtent({ geometry_column })), ST_ZMax(ST_3DExtent({ geometry_column })) FROM { geometry_table } WHERE { tileIdColumn }='{ t.Id }'";
                     var cmd = new NpgsqlCommand(sql, conn);
@@ -184,7 +183,7 @@ namespace pg2b3dm
             void getChildrenExtent( Tile t, BoundingBox3D bbox ) {
 
                 // Only leafs, since nodes might not yet have a proper bbox
-                if ( t.Id != 0 ) {
+                if ( !string.IsNullOrEmpty(t.Id) ) {
 
                     if (t.BoundingBox.XMin < bbox.XMin) {
                         bbox.XMin = t.BoundingBox.XMin;
@@ -243,7 +242,7 @@ namespace pg2b3dm
 
         private static int WriteTiles(string connectionString, string geometryTable, string geometryColumn, string idcolumn, double[] translation, List<Tile> tiles, int epsg, string outputPath, int counter, int maxcount, int skipHugeTiles, string colorColumn = "", string attributesColumn = "", string lodColumn="", bool SkipTiles=false, int MaxThreads=-1, string compressionType="", bool DisablePb=false)
         
-        {
+        {   
 
             object counterLock = new object();
             counter = 0;    

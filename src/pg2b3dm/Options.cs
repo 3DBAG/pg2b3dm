@@ -22,7 +22,7 @@ namespace pg2b3dm
         public string RoofColorColumn { get; set; }
         [Option('a', "attributescolumn", Required = false, Default = "", HelpText = "Attributes column")]
         public string AttributesColumn { get; set; }
-
+   
         [Option('i', "idcolumn", Required = false, Default = "id", HelpText = "Id column")]
         public string IdColumn { get; set; }
 
@@ -45,9 +45,6 @@ namespace pg2b3dm
 
         [Option("qttable", Required = true, HelpText = "Pre-defined quadtree full table")]
         public string QuadtreeTable { get; set; }
-
-        [Option("leavestable", Required = true, HelpText = "Pre-defined quadtree leaves table")]
-        public string LeavesTable { get; set; }
         
         [Option("compression", Required = false, Default = "", HelpText = "Tiles compression type (gzip)")]
         public string Compression { get; set; }

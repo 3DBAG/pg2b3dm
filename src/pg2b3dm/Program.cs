@@ -245,7 +245,7 @@ namespace pg2b3dm
         {   
 
             object counterLock = new object();
-            counter = 0;    
+            // counter = 0;    
 
             var options = new ParallelOptions();
             options.MaxDegreeOfParallelism = MaxThreads;

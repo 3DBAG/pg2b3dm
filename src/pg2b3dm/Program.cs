@@ -283,7 +283,7 @@ namespace pg2b3dm
                 var compressionExtension = "";
                 if ( compressionType == "gzip" )
                     compressionExtension = ".gz";
-                var filename = $"{outputPath}/tiles/{t.Id}.b3dm" + compressionExtension;
+                var filename = $"{outputPath}/tiles/{t.Id.Replace('/', '-')}.b3dm" + compressionExtension;
                 if (SkipTiles && File.Exists(filename))
                 {
                     return new_conn;

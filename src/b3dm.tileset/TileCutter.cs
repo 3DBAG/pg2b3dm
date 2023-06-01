@@ -54,7 +54,7 @@ namespace B3dm.Tileset
                                         ST_AsBinary(ST_MakePoint(ST_XMin(bbox), ST_YMin(bbox), ST_ZMin(bbox))) as min,
                                         ST_AsBinary(ST_MakePoint(ST_XMax(bbox), ST_YMax(bbox), ST_ZMax(bbox))) as max 
                                       FROM (
-                                                SELECT tile_id, ST_3DExtent({geometryColumn}) as bbox 
+                                                SELECT {tileIdColumn} as tile_id, ST_3DExtent({geometryColumn}) as bbox 
                                                 FROM {geometryTable}  
                                                 WHERE {lodcolumn} = {currentLod}
                                                 GROUP BY {tileIdColumn}

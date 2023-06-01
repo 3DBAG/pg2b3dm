@@ -27,7 +27,7 @@ namespace B3dm.Tileset
             return bytes;
         }
 
-        public static (int tileId, List<Tile> tiles, List<Tile> leaves) GetTiles(int tileId, NpgsqlConnection conn, double extentTile, string geometryTable, string geometryColumn, BoundingBox3D box3d, int epsg, int currentLod, List<int> lods, double[] geometricErrors, string quadtree_table, string tileIdColumn, string lodcolumn = "")
+        public static (int tileId, List<Tile> tiles, List<Tile> leaves) GetTiles(int tileId, NpgsqlConnection conn, double extentTile, string geometryTable, string geometryColumn, BoundingBox3D box3d, int epsg, int currentLod, double[] geometricErrors, string quadtree_table, string tileIdColumn, string lodcolumn = "")
         {
             // "tiles" to create the tileset with, "leaves" to give to the "writeTiles" function (this flat list helps for multithreading).
             var tiles = new List<Tile>();
@@ -55,7 +55,9 @@ namespace B3dm.Tileset
                                         ST_AsBinary(ST_MakePoint(ST_XMax(bbox), ST_YMax(bbox), ST_ZMax(bbox))) as max 
                                       FROM (
                                                 SELECT tile_id, ST_3DExtent({geometryColumn}) as bbox 
-                                                FROM {geometryTable}  GROUP BY {tileIdColumn}
+                                                FROM {geometryTable}  
+                                                WHERE {lodcolumn} = {currentLod}
+                                                GROUP BY {tileIdColumn}
                                             ) as bbox 
                                         ) as b
                           ON leaves.id = b.{tileIdColumn}";

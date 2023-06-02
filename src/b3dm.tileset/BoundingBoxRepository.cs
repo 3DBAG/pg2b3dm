@@ -79,7 +79,7 @@ namespace B3dm.Tileset
                 sqlselect = $"{sqlselect}, {attributesColumn} ";
             }
 
-            var sqlFrom = "FROM " + geometry_table;
+            var sqlFrom = " FROM " + geometry_table;
 
             var lodQuery = LodQuery.GetLodQuery(lodColumn, t.Lod);
             

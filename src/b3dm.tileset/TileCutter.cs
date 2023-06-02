@@ -101,7 +101,7 @@ namespace B3dm.Tileset
                 }
 
                 var tile = new Tile(b3dm_id, new BoundingBox3D(min.X.Value, min.Y.Value, min.Z.Value, max.X.Value, max.Y.Value, max.Z.Value)) {
-                    Lod = 0,
+                    Lod = currentLod,
                     GeometricError = error
                 };
 
@@ -136,7 +136,7 @@ namespace B3dm.Tileset
                     }
 
                     var tile = new Tile("", new BoundingBox3D(0.0, 0.0, 0.0, 0.0, 0.0, 0.0)) {
-                        Lod = 0,
+                        Lod = currentLod,
                         GeometricError = error,
                         Children = new List<Tile>()
                     };

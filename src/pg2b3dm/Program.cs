@@ -42,11 +42,11 @@ namespace pg2b3dm
 
                 if (o.Compression != "" && o.Compression != "gzip")
                 {
-                    Console.WriteLine($"the entered compression type \"{o.Compression}\" is not supported, output will be uncompressed!");
+                    Console.WriteLine($"The entered compression type \"{o.Compression}\" is not supported, output will be uncompressed!");
                     o.Compression = "";
                 }
 
-                Console.WriteLine($"start processing....");
+                Console.WriteLine($"Start processing....");
 
                 var stopWatch = new Stopwatch();
                 stopWatch.Start();
@@ -56,8 +56,8 @@ namespace pg2b3dm
                     Directory.CreateDirectory(output);
                 }
 
-                Console.WriteLine($"input table:  {o.GeometryTable}");
-                Console.WriteLine($"input geometry column:  {o.GeometryColumn}");
+                Console.WriteLine($"Input table:  {o.GeometryTable}");
+                Console.WriteLine($"Input geometry column:  {o.GeometryColumn}");
 
                 var geometryTable = o.GeometryTable;
                 var geometryColumn = o.GeometryColumn;
@@ -98,7 +98,6 @@ namespace pg2b3dm
                 
                 Console.WriteLine($"3D Boundingbox {geometryTable}.{geometryColumn}: [{bbox3d.XMin}, {bbox3d.YMin}, {bbox3d.ZMin},{bbox3d.XMax},{bbox3d.YMax}, {bbox3d.ZMax}]");
                 var translation = bbox3d.GetCenter().ToVector();
-                //  Console.WriteLine($"translation {geometryTable}.{geometryColumn}: [{string.Join(',', translation) }]");
                 var boundingboxAllFeatures = BoundingBoxCalculator.TranslateRotateX(bbox3d, Reverse(translation), Math.PI / 2);
                 var box = boundingboxAllFeatures.GetBox();
 
@@ -107,31 +106,28 @@ namespace pg2b3dm
                 translation[2] = 0;
 
                 var sr = SpatialReferenceRepository.GetSpatialReference(conn, geometryTable, geometryColumn);
-                Console.WriteLine($"spatial reference: {sr}");
-                Console.WriteLine($"reading quadtree...");
+                Console.WriteLine($"Spatial reference: {sr}");
+                Console.WriteLine($"Reading quadtree...");
 
                 // Extract files for each LoD
                 foreach(var lod in lods){
                     Console.WriteLine();
                     Console.WriteLine($"Extracting files for LoD: {lod}");
 
-                    var lod_dir = $"{output}/lod{lod}";
-                    if (!Directory.Exists(lod_dir)) {
-                        Directory.CreateDirectory(lod_dir);
-                    }
+                    var lod_dir = $"{output}{Path.DirectorySeparatorChar}lod{lod}";
                     var outputTiles = $"{lod_dir}{Path.DirectorySeparatorChar}tiles";
                     if (!Directory.Exists(outputTiles)) {
                         Directory.CreateDirectory(outputTiles);
                     }
-                    Console.WriteLine($"output directory:  {outputTiles}");
+                    Console.WriteLine($"Output directory:  {outputTiles}");
                     
                     var tiles = TileCutter.GetTiles(0, conn, o.ExtentTile, geometryTable, geometryColumn, bbox3d, sr, lod, geometricErrors.Skip(1).ToArray(), QuadtreeTable, tileIdColumn, lodcolumn);
 
                     var leavesHeights = new Dictionary<String, (double, double)>();
                     CalculateBoundingBoxes(conn, translation, tiles.tiles, leavesHeights, geometryTable, geometryColumn, sr);
                     var nrOfTiles = RecursiveTileCounter.CountTiles(tiles.tiles, 0);
-                    Console.WriteLine($"tiles with features: {nrOfTiles} ");
-                    Console.WriteLine("writing tileset.json...");
+                    Console.WriteLine($"Tiles with features: {nrOfTiles} ");
+                    Console.WriteLine("Writing tileset.json...");
                     var json = TreeSerializer.ToJson(tiles.tiles, translation, box, geometricErrors[0], o.Refinement);
                     File.WriteAllText($"{lod_dir}/tileset.json", json);
                     WriteTiles(connectionString, geometryTable, geometryColumn, idcolumn, translation, tiles.leaves, sr, lod_dir, 0, nrOfTiles, o.skipHugeTiles, o.RoofColorColumn, o.AttributesColumn, o.LodColumn, o.SkipTiles, o.MaxThreads, o.Compression, o.DisablePb);
@@ -139,8 +135,8 @@ namespace pg2b3dm
 
                 stopWatch.Stop();
                 Console.WriteLine();
-                Console.WriteLine($"elapsed: {stopWatch.ElapsedMilliseconds / 1000} seconds");
-                Console.WriteLine("program finished.");
+                Console.WriteLine($"Elapsed: {stopWatch.ElapsedMilliseconds / 1000} seconds");
+                Console.WriteLine("Program finished.");
             });
         }
 

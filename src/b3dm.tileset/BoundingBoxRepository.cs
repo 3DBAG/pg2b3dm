@@ -86,7 +86,6 @@ namespace B3dm.Tileset
             var sqlWhere = $" WHERE { tileIdColumn }='{ t.Id }'";
 
             var sql = sqlselect + sqlFrom + sqlWhere + lodQuery;
-            Console.WriteLine($"GINAA {sql}");
             
             conn.Open();
             var cmd = new NpgsqlCommand(sql, conn);

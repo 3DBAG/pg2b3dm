@@ -42,33 +42,26 @@ namespace pg2b3dm
 
                 if (o.Compression != "" && o.Compression != "gzip")
                 {
-                    Console.WriteLine($"the entered compression type \"{o.Compression}\" is not supported, output will be uncompressed!");
+                    Console.WriteLine($"The entered compression type \"{o.Compression}\" is not supported, output will be uncompressed!");
                     o.Compression = "";
                 }
 
-                Console.WriteLine($"start processing....");
+                Console.WriteLine($"Start processing....");
 
                 var stopWatch = new Stopwatch();
                 stopWatch.Start();
 
                 var output = o.Output;
-                var outputTiles = $"{output}{Path.DirectorySeparatorChar}tiles";
                 if (!Directory.Exists(output)) {
                     Directory.CreateDirectory(output);
                 }
-                if (!Directory.Exists(outputTiles)) {
-                    Directory.CreateDirectory(outputTiles);
-                }
 
-                Console.WriteLine($"input table:  {o.GeometryTable}");
-                Console.WriteLine($"input geometry column:  {o.GeometryColumn}");
-
-                Console.WriteLine($"output directory:  {outputTiles}");
+                Console.WriteLine($"Input table:  {o.GeometryTable}");
+                Console.WriteLine($"Input geometry column:  {o.GeometryColumn}");
 
                 var geometryTable = o.GeometryTable;
                 var geometryColumn = o.GeometryColumn;
                 var QuadtreeTable = o.QuadtreeTable;
-                var LeavesTable = o.LeavesTable;
                 var idcolumn = o.IdColumn;
                 var lodcolumn = o.LodColumn;
                 var tileIdColumn = o.TileIDColumn;
@@ -105,7 +98,6 @@ namespace pg2b3dm
                 
                 Console.WriteLine($"3D Boundingbox {geometryTable}.{geometryColumn}: [{bbox3d.XMin}, {bbox3d.YMin}, {bbox3d.ZMin},{bbox3d.XMax},{bbox3d.YMax}, {bbox3d.ZMax}]");
                 var translation = bbox3d.GetCenter().ToVector();
-                //  Console.WriteLine($"translation {geometryTable}.{geometryColumn}: [{string.Join(',', translation) }]");
                 var boundingboxAllFeatures = BoundingBoxCalculator.TranslateRotateX(bbox3d, Reverse(translation), Math.PI / 2);
                 var box = boundingboxAllFeatures.GetBox();
 
@@ -114,24 +106,37 @@ namespace pg2b3dm
                 translation[2] = 0;
 
                 var sr = SpatialReferenceRepository.GetSpatialReference(conn, geometryTable, geometryColumn);
-                Console.WriteLine($"spatial reference: {sr}");
-                Console.WriteLine($"reading quadtree...");
-                var tiles = TileCutter.GetTiles(0, conn, o.ExtentTile, geometryTable, geometryColumn, bbox3d, sr, 0, lods, geometricErrors.Skip(1).ToArray(), QuadtreeTable, LeavesTable, tileIdColumn, lodcolumn);
-                Console.WriteLine();
-                var leavesHeights = new Dictionary<String, (double, double)>();
-                CalculateBoundingBoxes(conn, translation, tiles.tiles, leavesHeights, geometryTable, geometryColumn, sr);
-                var nrOfTiles = RecursiveTileCounter.CountTiles(tiles.tiles, 0);
-                Console.WriteLine($"tiles with features: {nrOfTiles} ");
-                Console.WriteLine("writing tileset.json...");
-                var json = TreeSerializer.ToJson(tiles.tiles, translation, box, geometricErrors[0], o.Refinement);
-                File.WriteAllText($"{o.Output}/tileset.json", json);
+                Console.WriteLine($"Spatial reference: {sr}");
+                Console.WriteLine($"Reading quadtree...");
 
-                WriteTiles(connectionString, geometryTable, geometryColumn, idcolumn, translation, tiles.leaves, sr, o.Output, 0, nrOfTiles, o.skipHugeTiles, o.RoofColorColumn, o.AttributesColumn, o.LodColumn, o.SkipTiles, o.MaxThreads, o.Compression, o.DisablePb);
+                // Extract files for each LoD
+                foreach(var lod in lods){
+                    Console.WriteLine();
+                    Console.WriteLine($"Extracting files for LoD: {lod}");
+
+                    var lod_dir = $"{output}{Path.DirectorySeparatorChar}lod{lod}";
+                    var outputTiles = $"{lod_dir}{Path.DirectorySeparatorChar}tiles";
+                    if (!Directory.Exists(outputTiles)) {
+                        Directory.CreateDirectory(outputTiles);
+                    }
+                    Console.WriteLine($"Output directory:  {outputTiles}");
+                    
+                    var tiles = TileCutter.GetTiles(0, conn, o.ExtentTile, geometryTable, geometryColumn, bbox3d, sr, lod, geometricErrors.Skip(1).ToArray(), QuadtreeTable, tileIdColumn, lodcolumn);
+
+                    var leavesHeights = new Dictionary<String, (double, double)>();
+                    CalculateBoundingBoxes(conn, translation, tiles.tiles, leavesHeights, geometryTable, geometryColumn, sr);
+                    var nrOfTiles = RecursiveTileCounter.CountTiles(tiles.tiles, 0);
+                    Console.WriteLine($"Tiles with features: {nrOfTiles} ");
+                    Console.WriteLine("Writing tileset.json...");
+                    var json = TreeSerializer.ToJson(tiles.tiles, translation, box, geometricErrors[0], o.Refinement);
+                    File.WriteAllText($"{lod_dir}/tileset.json", json);
+                    WriteTiles(connectionString, geometryTable, geometryColumn, idcolumn, translation, tiles.leaves, sr, lod_dir, 0, nrOfTiles, o.skipHugeTiles, o.RoofColorColumn, o.AttributesColumn, o.LodColumn, o.SkipTiles, o.MaxThreads, o.Compression, o.DisablePb);
+                }
 
                 stopWatch.Stop();
                 Console.WriteLine();
-                Console.WriteLine($"elapsed: {stopWatch.ElapsedMilliseconds / 1000} seconds");
-                Console.WriteLine("program finished.");
+                Console.WriteLine($"Elapsed: {stopWatch.ElapsedMilliseconds / 1000} seconds");
+                Console.WriteLine("Program finished.");
             });
         }
 
@@ -144,7 +149,7 @@ namespace pg2b3dm
 
             void calculateLeavesHeights( Tile t, Dictionary<String, (double, double)> heights  ) {
 
-                if ( t.Id != 0 ) {
+                if ( !string.IsNullOrEmpty(t.Id) ) {
 
                     var sql = $"SELECT ST_ZMin(ST_3DExtent({ geometry_column })), ST_ZMax(ST_3DExtent({ geometry_column })) FROM { geometry_table } WHERE { tileIdColumn }='{ t.Id }'";
                     var cmd = new NpgsqlCommand(sql, conn);
@@ -184,7 +189,7 @@ namespace pg2b3dm
             void getChildrenExtent( Tile t, BoundingBox3D bbox ) {
 
                 // Only leafs, since nodes might not yet have a proper bbox
-                if ( t.Id != 0 ) {
+                if ( !string.IsNullOrEmpty(t.Id) ) {
 
                     if (t.BoundingBox.XMin < bbox.XMin) {
                         bbox.XMin = t.BoundingBox.XMin;
@@ -243,10 +248,10 @@ namespace pg2b3dm
 
         private static int WriteTiles(string connectionString, string geometryTable, string geometryColumn, string idcolumn, double[] translation, List<Tile> tiles, int epsg, string outputPath, int counter, int maxcount, int skipHugeTiles, string colorColumn = "", string attributesColumn = "", string lodColumn="", bool SkipTiles=false, int MaxThreads=-1, string compressionType="", bool DisablePb=false)
         
-        {
+        {   
 
             object counterLock = new object();
-            counter = 0;    
+            // counter = 0;    
 
             var options = new ParallelOptions();
             options.MaxDegreeOfParallelism = MaxThreads;
@@ -277,14 +282,14 @@ namespace pg2b3dm
                     if (!DisablePb) {
                         pb.Refresh(counter, $"{counter}/{maxcount} - {perc:F}%");
                     } else {
-                        Console.Write($"\rcreating tiles: {counter}/{maxcount} - {perc:F}%");
+                        Console.WriteLine($"\rcreating tiles: {counter}/{maxcount} - {perc:F}%");
                     }
                 }
 
                 var compressionExtension = "";
                 if ( compressionType == "gzip" )
                     compressionExtension = ".gz";
-                var filename = $"{outputPath}/tiles/{t.Id}.b3dm" + compressionExtension;
+                var filename = $"{outputPath}/tiles/{t.Id.Replace('/', '-')}.b3dm" + compressionExtension;
                 if (SkipTiles && File.Exists(filename))
                 {
                     return new_conn;

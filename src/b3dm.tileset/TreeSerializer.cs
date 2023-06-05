@@ -65,9 +65,9 @@ namespace B3dm.Tileset
             };
             child.boundingVolume = tile.Boundingvolume;
             // Tile IDs of nodes are 0
-            if ( tile.Id != 0 ) {
+            if ( !string.IsNullOrEmpty(tile.Id) ) {
                 child.content = new Content();
-                child.content.uri = $"tiles/{tile.Id}.b3dm";
+                child.content.uri = $"tiles/{tile.Id.Replace('/','-')}.b3dm";
             }
             return child;
         }

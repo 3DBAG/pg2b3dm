@@ -45,7 +45,7 @@ namespace B3dm.Tileset
         public static BoundingBox3D GetBoundingBox3DForQT(NpgsqlConnection conn, string quadtree_table) {
 
             conn.Open();
-            var sql = $"SELECT ST_AsBinary(geom) FROM {quadtree_table} WHERE z=0";
+            var sql = $"SELECT ST_AsBinary(geom) FROM {quadtree_table} WHERE level=0 AND NOT leaf;";
             var cmd = new NpgsqlCommand(sql, conn);
             var reader = cmd.ExecuteReader();
             reader.Read();
@@ -79,13 +79,14 @@ namespace B3dm.Tileset
                 sqlselect = $"{sqlselect}, {attributesColumn} ";
             }
 
-            var sqlFrom = "FROM " + geometry_table;
+            var sqlFrom = " FROM " + geometry_table;
 
             var lodQuery = LodQuery.GetLodQuery(lodColumn, t.Lod);
+            
             var sqlWhere = $" WHERE { tileIdColumn }='{ t.Id }'";
 
-            var sql = sqlselect + sqlFrom + sqlWhere;
-
+            var sql = sqlselect + sqlFrom + sqlWhere + lodQuery;
+            
             conn.Open();
             var cmd = new NpgsqlCommand(sql, conn);
             var reader = cmd.ExecuteReader();

@@ -27,7 +27,7 @@ namespace B3dm.Tileset
             return bytes;
         }
 
-        public static (int tileId, List<Tile> tiles, List<Tile> leaves) GetTiles(int tileId, NpgsqlConnection conn, double extentTile, string geometryTable, string geometryColumn, BoundingBox3D box3d, int epsg, int currentLod, List<int> lods, double[] geometricErrors, string quadtree_table, string leaves_table, string tileIdColumn, string lodcolumn = "")
+        public static (int tileId, List<Tile> tiles, List<Tile> leaves) GetTiles(int tileId, NpgsqlConnection conn, double extentTile, string geometryTable, string geometryColumn, BoundingBox3D box3d, int epsg, int currentLod, double[] geometricErrors, string quadtree_table, string tileIdColumn, string lodcolumn = "")
         {
             // "tiles" to create the tileset with, "leaves" to give to the "writeTiles" function (this flat list helps for multithreading).
             var tiles = new List<Tile>();
@@ -40,61 +40,72 @@ namespace B3dm.Tileset
             // Standard geometric error (don't set to 0, it will make 3DTilesRendererJS skip the tiles)
             var error = 500;
 
-            var sql1 = $"SELECT MAX(z) FROM {quadtree_table};";
-            var sql2 = $"SELECT f.pid, f.id, l.tile_id AS b3dm_id, ST_AsBinary(l.tile_polygon) AS leaf_geom, b.min AS min, b.max AS max FROM {quadtree_table} AS f, {leaves_table} AS l INNER JOIN ( SELECT tile_id, ST_Xmin(bbox) as bbox, ST_AsBinary(ST_MakePoint(ST_XMin(bbox), ST_YMin(bbox), ST_ZMin(bbox))) as min, ST_AsBinary(ST_MakePoint(ST_XMax(bbox), ST_YMax(bbox), ST_ZMax(bbox))) as max FROM (SELECT tile_id, ST_3DExtent({geometryColumn}) as bbox FROM {geometryTable} GROUP BY {tileIdColumn}) as bbox ) AS b ON (l.{tileIdColumn} = b.{tileIdColumn}) WHERE ST_Intersects(l.tile_polygon, f.geom) AND (ST_Equals(l.tile_polygon, f.geom))";
+            var sql1 = $"SELECT MAX(level) FROM {quadtree_table} WHERE NOT leaf;";             
+            var sql2 = $@"SELECT leaves.id, leaves.parents, 
+                                  b.min AS min, b.max AS max 
+                          FROM (SELECT c.id as id, array_agg(p.id ORDER by p.id DESC) as parents
+                                FROM {quadtree_table} c
+                                INNER JOIN {quadtree_table} p 
+                                ON c.level != p.level 
+                                AND ST_within(c.geom, p.geom)
+                                WHERE c.leaf
+                                GROUP BY c.id) as leaves
+                          INNER JOIN (SELECT tile_id,
+                                        ST_AsBinary(ST_MakePoint(ST_XMin(bbox), ST_YMin(bbox), ST_ZMin(bbox))) as min,
+                                        ST_AsBinary(ST_MakePoint(ST_XMax(bbox), ST_YMax(bbox), ST_ZMax(bbox))) as max 
+                                      FROM (
+                                                SELECT {tileIdColumn} as tile_id, ST_3DExtent({geometryColumn}) as bbox 
+                                                FROM {geometryTable}  
+                                                WHERE {lodcolumn} = {currentLod}
+                                                GROUP BY {tileIdColumn}
+                                            ) as bbox 
+                                        ) as b
+                          ON leaves.id = b.{tileIdColumn}";
+            
             conn.Open();
             var cmd = new NpgsqlCommand(sql1, conn);
             var reader = cmd.ExecuteReader();
             reader.Read();
+            var max_z = reader.GetInt32(0);
+            reader.Close();
+
 
             // Init nested lists with amount of tile levels
-            var max_z = reader.GetInt32(0);
-
             foreach (int i in Enumerable.Range(0, max_z + 1)) {
                 used_nodes_indices.Add(new Dictionary<String, (String, Tile)>());
                 used_nodes.Add(new Dictionary<String, (String, Tile)>());
             }
                 
-            reader.Close();
-
             // Store all leaves as tiles and keep the indices of their parents. Query matches leaves with quadtree nodes
             cmd = new NpgsqlCommand(sql2, conn);
             reader = cmd.ExecuteReader();
             while (reader.Read()) {
 
-                var parent_id = reader.GetString(0);
-                var node_id = reader.GetString(1);
-                var b3dm_id = reader.GetString(2);
-                var min_stream = reader.GetStream(4);
+                var node_id = reader.GetString(0);
+                var b3dm_id = reader.GetString(0);
+                string[] parents = (String[])reader.GetValue(1);
+                var first_parent_id = parents[0];
+                var min_stream = reader.GetStream(2);
                 var min = Geometry.Deserialize<WkbSerializer>(min_stream).GetCenter();
                 min_stream.Close();
-                var max_stream = reader.GetStream(5);
+                var max_stream = reader.GetStream(3);
                 var max = Geometry.Deserialize<WkbSerializer>(max_stream).GetCenter();
                 max_stream.Close();
                 
-                string[] parent_ids = parent_id.Split('-');
-                List<string> p_ids = new List<string>(parent_ids);
-                
-                var parent_levels = parent_ids.Length;
-                
-                foreach (int level in Enumerable.Range(0, parent_levels).Reverse()) {
-                    
-                    var id = String.Join("-", p_ids.GetRange(0, level+1));
+                foreach (string parent_id in parents) {
+                    var parent_level = Int32.Parse(parent_id.Split('/')[0]);
 
-                    if ( !used_nodes_indices[level].ContainsKey(id) ) {
-
-                        used_nodes_indices[level].Add(id, (null, null));
-                        
+                    if ( !used_nodes_indices[parent_level].ContainsKey(parent_id) ) {
+                        used_nodes_indices[parent_level].Add(parent_id, (null, null));
                     }
-
                 }
 
-                var tile = new Tile(Int32.Parse(b3dm_id), new BoundingBox3D(min.X.Value, min.Y.Value, min.Z.Value, max.X.Value, max.Y.Value, max.Z.Value)) {
-                    Lod = 0,
+                var tile = new Tile(b3dm_id, new BoundingBox3D(min.X.Value, min.Y.Value, min.Z.Value, max.X.Value, max.Y.Value, max.Z.Value)) {
+                    Lod = currentLod,
                     GeometricError = error
                 };
 
-                leaf_nodes[node_id] = (parent_id, tile);
+                leaf_nodes[node_id] = (first_parent_id, tile);
                 leaves.Add(tile);
 
             }
@@ -108,16 +119,24 @@ namespace B3dm.Tileset
                 List<string> keys = new List<string>(level.Keys);
                 string keys_str = string.Format("'{0}'", string.Join("','", keys));
 
-                var sql3 = $"SELECT id, pid FROM {quadtree_table} WHERE id in ({keys_str})";
+                var sql3 = $@"SELECT c.id AS id, p.id AS p_id
+                              FROM {quadtree_table} c 
+                              LEFT JOIN {quadtree_table} p
+                              ON c.level = p.level+1 
+                              AND ST_within(c.geom, p.geom)
+                              WHERE c.id in ({keys_str})";
                 cmd = new NpgsqlCommand(sql3, conn);
                 reader = cmd.ExecuteReader();
                 while ( reader.Read() ) {
 
                     var id = reader.GetString(0);
-                    var pid = reader.GetString(1);
+                    var pid = "";
+                    if (level_i !=0){ // if level is 0 then there is on parent (node '0/0/0')
+                        pid = reader.GetString(1);
+                    }
 
-                    var tile = new Tile(0, new BoundingBox3D(0.0, 0.0, 0.0, 0.0, 0.0, 0.0)) {
-                        Lod = 0,
+                    var tile = new Tile("", new BoundingBox3D(0.0, 0.0, 0.0, 0.0, 0.0, 0.0)) {
+                        Lod = currentLod,
                         GeometricError = error,
                         Children = new List<Tile>()
                     };
@@ -137,14 +156,14 @@ namespace B3dm.Tileset
 
                 var pid = leaf.Value.Item1;
                 var tile = leaf.Value.Item2;
-                var parent_level = pid.Split('-').Length - 1;
+                var parent_level = Int32.Parse(pid.Split('/')[0]);
                 used_nodes[parent_level][pid].Item2.Children.Add(tile);
 
             }
 
             // Link all nodes bottom-up
             foreach ( var i in Enumerable.Range(1, used_nodes.Count - 1).Reverse() ) {
-                foreach ( KeyValuePair<String, (String, Tile)> entry in used_nodes[i] ) {
+                foreach ( KeyValuePair<String, (String, Tile)> entry in used_nodes[i] ) {   
 
                     var node = entry.Value;
                     var plevel = i - 1;

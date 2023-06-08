@@ -283,7 +283,6 @@ namespace pg2b3dm
                         pb.Refresh(counter, $"{counter}/{maxcount} - {perc:F}%");
                     } else {
                         Console.WriteLine($"\rcreating tiles: {counter}/{maxcount} - {perc:F}%");
-                        Console.WriteLine($"Tile: {t.Id.ToString()}");
                     }
                 }
 
@@ -308,6 +307,7 @@ namespace pg2b3dm
 
                 var attributes = GetAttributes(geometries);
 
+                Console.WriteLine($"Tile: {t.Id.ToString()}");
                 var b3dm = B3dmCreator.GetB3dm(attributesColumn, attributes, triangleCollection);
 
                 var bytes = b3dm.ToBytes();

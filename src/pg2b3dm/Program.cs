@@ -351,7 +351,7 @@ namespace pg2b3dm
                 Console.WriteLine("\nAaaand... done!");
             }
             if ( skippedTiles.Count > 0 ) {
-                System.Console.WriteLine("Some tiles have been skipped because they were too big. See \"skippedtiles.txt\".");
+                System.Console.WriteLine("Some tiles have been skipped because they were too big or because there were problematic geometries. See \"skippedtiles.txt\".");
             }
 
             return counter;

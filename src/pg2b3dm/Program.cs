@@ -307,9 +307,18 @@ namespace pg2b3dm
 
                 var attributes = GetAttributes(geometries);
 
-                var b3dm = B3dmCreator.GetB3dm(attributesColumn, attributes, triangleCollection);
+                var bytes =  new byte[0];
+                try {
+                    
+                    var b3dm = B3dmCreator.GetB3dm(attributesColumn, attributes, triangleCollection);
+                    bytes = b3dm.ToBytes();
+                }
+                catch (Exception ex) {
+                    System.Console.WriteLine($"Problematic Tile  {t.Id.ToString()} with {triangleCollection.Count} triangles skipped: \n, Error msg: {ex}");
+                    skippedTiles.Add(t.Id.ToString());
+                    return new_conn;
+                }
 
-                var bytes = b3dm.ToBytes();
 
                 if (compressionType == "")
                 {
@@ -342,7 +351,7 @@ namespace pg2b3dm
                 Console.WriteLine("\nAaaand... done!");
             }
             if ( skippedTiles.Count > 0 ) {
-                System.Console.WriteLine("Some tiles have been skipped because they were too big. See \"skippedtiles.txt\".");
+                System.Console.WriteLine("Some tiles have been skipped because they were too big or because there were problematic geometries. See \"skippedtiles.txt\".");
             }
 
             return counter;

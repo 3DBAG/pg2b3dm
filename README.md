@@ -28,7 +28,7 @@ CONSTRAINT id PRIMARY KEY (id));
 Then import the file with:
 ```SQL
 \COPY tiles.quadtree 
-FROM '/Users/gina/Downloads/quadtree.tsv'
+FROM '/path/to/quadtree/quadtree.tsv'
 DELIMITER E'\t'
 CSV HEADER;
 ```
@@ -43,12 +43,12 @@ USING ST_GeomFromText(geom, 28992);
 
 ##  How to create the gpkg table:
 
-Find the paths to files (on the gilfoyle)
+Find the paths to files (on gilfoyle)
 ```bash
 find -L /path/to/gpkg/files/ -path "/path/to/gpkg/files/*tri.gpkg" > all_gpkg.txt
 ```
 
-Import files table:
+Import files into tiles.gpkg_files table in the baseregisters schema (on gilfoyle):
 
 ```bash
  while read f; do
@@ -56,49 +56,63 @@ Import files table:
    echo ${base_name}
    names=($(echo ${base_name} | sed s/-/\\n/g))
    id=${names[0]}/${names[1]}/${names[2]}
-   lod=${names[3]: -2:-1}.${names[3]: -1}
-   dim=${names[4]: 0:2}
-    ogr2ogr -update -append  -f "PostgreSQL" PG:"host=localhost user=<USERNAME> dbname=baseregisters password=<PASSWORD>" $f -nlt MULTIPOLYGON -nln tiles.gpkg_files -sql """SELECT '$base_name' AS filename, ${names[0]} AS level,  '$id' AS tile_id, '$lod' AS lod, * FROM geom"""
+   lod=${names[3]: -2}
+    ogr2ogr -update -append  -f "PostgreSQL" PG:"host=localhost user=<USERNAME> dbname=baseregisters password=<PASSWORD>" $f -nlt MULTIPOLYGON25D -nln tiles.gpkg_files -sql """SELECT '$base_name' AS filename, ${names[0]} AS level,  '$id' AS tile_id, ${lod} AS lod, * FROM geom"""
 done < all_gpkg.txt
 ```
 
-After importing you need to create the attributes column :
+After importing you need to create the attributes column and also correct the Z dimension of geometries by subtracting the ground height:
 
 ```SQL
-ALTER TABLE tiles.gpkg_tri_last ADD COLUMN attributes text;
-UPDATE tiles.gpkg_tri_last SET attributes  = ROW_TO_JSON(
+ALTER TABLE tiles.gpkg_files ADD COLUMN attributes text;
+UPDATE tiles.gpkg_files SET attributes  = ROW_TO_JSON(
 (SELECT d
   FROM (
     SELECT 
-        "processfeatures.area_m" as area_m, 
-				"processfeatures.identificatie" as identificatie, 
-				"processfeatures.max_z" as max_z, 
-				"processfeatures.method" as method, 
-				"processfeatures.min_roof_z" as min_roof_z,
-				"processfeatures.min_z" as min_z,
-				"processfeatures.rmse_lod12" as rmse_lod12, 
-				"processfeatures.rmse_lod13" as rmse_lod13,
-				"processfeatures.rmse_lod22" as rmse_lod22,
-				"processfeatures.roof_type" as roof_type,
-				"processfeatures.source" as source,
-				"processfeatures.survey_date" as survey_date,
-				"processfeatures.val3dity_codes_lod12" as val3dity_codes_lod12,
-				"processfeatures.val3dity_codes_lod13" as val3dity_codes_lod13,
-				"processfeatures.val3dity_codes_lod22" as val3dity_codes_lod22
+        "processfeatures.ogrloader.nodata_frac_ahn3" as nodata_frac_AHN3,
+		"processfeatures.ogrloader.nodata_frac_ahn4" as nodata_frac_AHN4,
+		"processfeatures.ogrloader.nodata_r_ahn3" as nodata_r_AHN3,
+		"processfeatures.ogrloader.nodata_r_ahn4" as nodata_r_AHN4,
+		"processfeatures.ogrloader.oorspronkelijkbouwjaar" as oorspronkelijkbouwjaar,
+		"processfeatures.ogrloader.pc_select" as pc_select,
+		"processfeatures.ogrloader.pc_source" as pc_source,
+		"processfeatures.ogrloader.pt_density_ahn3" as pt_density_AHN3,
+		"processfeatures.ogrloader.pt_density_ahn4" as pt_density_AHN4,
+		"processfeatures.area_m" as area_m,
+		"processfeatures.h_dak_max" as h_dak_max,
+		"processfeatures.h_dak_min" as h_dak_min,
+		"processfeatures.h_maaiveld" as h_maaiveld,
+		"processfeatures.identificatie" as identificatie,
+		"processfeatures.rmse_lod12" as rmse_lod12,
+		"processfeatures.rmse_lod13" as rmse_lod13,
+		"processfeatures.rmse_lod22" as rmse_lod22,
+		"processfeatures.val3dity_codes_lod22" as val3dity_codes_lod22,
+		"processfeatures.volume_lod12" as volume_lod12,
+		"processfeatures.volume_lod13" as volume_lod13,
+		"processfeatures.volume_lod22" as volume_lod22
     ) d))::text;
+
+UPDATE tiles.gpkg_files SET geom = ST_Translate(geom, 0, 0, "processfeatures.h_maaiveld" * -1.0); 
 ```
 
+## Create the 3D tiles.
 
-Then after cloning the repo on the server, you can build from within the root of the repo with:
+Then after cloning the repo on godzilla, you need to activate a tunnel to gilfoyle:
+
 ```bash
-  cd src/pg2b3dm
+ssh -f -N -M -S /tmp/gilfoyle_postgres -L 5435:localhost:5432 gilfoyle
+```
+
+Then you can build from within the root of the repo with:
+```bash
+  cd pg2b3dm/src/pg2b3dm
   dotnet build
 ```
 
-And then run the command:
+And then run the command (make sure you have a .pgpass file with the credentials for the gilfoyle DB):
 
 ```bash
-  dotnet run -- -U <USER_NAME> --dbname baseregisters -t 'tiles.gpkg_files' -c 'geom' -i 'ogc_fid' --qttable tiles.quadtree --tileidcolumn tile_id --lodcolumn lod --attributescolumn attributes --skiptilesntriangles 3500000 --passfile ~/.pgpass --maxthreads 30 --compression gzip --disableprogressbar -o ./output 
+dotnet run -- -U <USER_NAME> -p 5435 --dbname baseregisters -t 'tiles.gpkg_files' -c 'geom' -i 'ogc_fid' --qttable tiles.quadtree --tileidcolumn tile_id --lodcolumn lod --attributescolumn attributes --skiptilesntriangles 3500000 --passfile ~/.pgpass --maxthreads 30 --compression gzip --disableprogressbar -o /data/3DBAGv2/export/3dtiles/v2306_test  --skiptiles
  ```
 
 ## Command line options

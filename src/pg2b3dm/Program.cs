@@ -307,7 +307,7 @@ namespace pg2b3dm
 
                 var attributes = GetAttributes(geometries);
 
-                var bytes =  new byte[7];
+                var bytes =  new byte[0];
                 try {
                     
                     var b3dm = B3dmCreator.GetB3dm(attributesColumn, attributes, triangleCollection);

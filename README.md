@@ -28,7 +28,7 @@ CONSTRAINT id PRIMARY KEY (id));
 Then import the file with:
 ```SQL
 \COPY tiles.quadtree 
-FROM '/Users/gina/Downloads/quadtree.tsv'
+FROM '/path/to/quadtree/quadtree.tsv'
 DELIMITER E'\t'
 CSV HEADER;
 ```

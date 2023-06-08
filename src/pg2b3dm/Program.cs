@@ -283,6 +283,7 @@ namespace pg2b3dm
                         pb.Refresh(counter, $"{counter}/{maxcount} - {perc:F}%");
                     } else {
                         Console.WriteLine($"\rcreating tiles: {counter}/{maxcount} - {perc:F}%");
+                        Console.WriteLine($"Tile: {t.Id.ToString()}");
                     }
                 }
 

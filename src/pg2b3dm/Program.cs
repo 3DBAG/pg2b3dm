@@ -307,10 +307,17 @@ namespace pg2b3dm
 
                 var attributes = GetAttributes(geometries);
 
-                Console.WriteLine($"Tile: {t.Id.ToString()}");
-                var b3dm = B3dmCreator.GetB3dm(attributesColumn, attributes, triangleCollection);
+                var bytes =  new byte[7];
+                try {
+                    
+                    var b3dm = B3dmCreator.GetB3dm(attributesColumn, attributes, triangleCollection);
+                    bytes = b3dm.ToBytes();
+                }
+                catch (System.AggregateException ex) {
+                    Console.WriteLine($"Problematic Tile: {t.Id.ToString()}, Error msg: {ex}");
+                }
 
-                var bytes = b3dm.ToBytes();
+                
 
                 if (compressionType == "")
                 {

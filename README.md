@@ -61,7 +61,7 @@ Import files into tiles.gpkg_files table in the baseregisters schema (on gilfoyl
 done < all_gpkg.txt
 ```
 
-After importing you need to create the attributes column :
+After importing you need to create the attributes column and also correct the Z dimension of geometries by subtracting the ground height:
 
 ```SQL
 ALTER TABLE tiles.gpkg_files ADD COLUMN attributes text;
@@ -91,6 +91,8 @@ UPDATE tiles.gpkg_files SET attributes  = ROW_TO_JSON(
 		"processfeatures.volume_lod13" as volume_lod13,
 		"processfeatures.volume_lod22" as volume_lod22
     ) d))::text;
+
+UPDATE tiles.gpkg_files SET geom = ST_Translate(geom, 0, 0, "processfeatures.h_maaiveld" * -1.0); 
 ```
 
 ## Create the 3D tiles.
@@ -110,7 +112,7 @@ Then you can build from within the root of the repo with:
 And then run the command (make sure you have a .pgpass file with the credentials for the gilfoyle DB):
 
 ```bash
-  dotnet run -- -U <USER_NAME> --p 5435 -dbname baseregisters -t 'tiles.gpkg_files' -c 'geom' -i 'ogc_fid' --qttable tiles.quadtree --tileidcolumn tile_id --lodcolumn lod --attributescolumn attributes --skiptilesntriangles 3500000 --passfile ~/.pgpass --maxthreads 30 --compression gzip --disableprogressbar -o /data/3DBAGv3/export/3dtiles  --skiptiles
+dotnet run -- -U <USER_NAME> -p 5435 --dbname baseregisters -t 'tiles.gpkg_files' -c 'geom' -i 'ogc_fid' --qttable tiles.quadtree --tileidcolumn tile_id --lodcolumn lod --attributescolumn attributes --skiptilesntriangles 3500000 --passfile ~/.pgpass --maxthreads 30 --compression gzip --disableprogressbar -o /data/3DBAGv2/export/3dtiles/v2306_test  --skiptiles
  ```
 
 ## Command line options

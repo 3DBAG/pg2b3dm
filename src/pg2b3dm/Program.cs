@@ -313,7 +313,7 @@ namespace pg2b3dm
                     var b3dm = B3dmCreator.GetB3dm(attributesColumn, attributes, triangleCollection);
                     bytes = b3dm.ToBytes();
                 }
-                catch (System.AggregateException ex) {
+                catch (Exception ex) {
                     Console.WriteLine($"Problematic Tile: {t.Id.ToString()}, Error msg: {ex}");
                 }
 

@@ -314,10 +314,11 @@ namespace pg2b3dm
                     bytes = b3dm.ToBytes();
                 }
                 catch (Exception ex) {
-                    Console.WriteLine($"Problematic Tile: {t.Id.ToString()}, Error msg: {ex}");
+                    System.Console.WriteLine($"Problematic Tile  {t.Id.ToString()} with {triangleCollection.Count} triangles skipped: \n, Error msg: {ex}");
+                    skippedTiles.Add(t.Id.ToString());
+                    return new_conn;
                 }
 
-                
 
                 if (compressionType == "")
                 {

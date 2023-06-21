@@ -69,30 +69,35 @@ UPDATE tiles.gpkg_files SET attributes  = ROW_TO_JSON(
 (SELECT d
   FROM (
     SELECT 
-        "processfeatures.ogrloader.nodata_frac_ahn3" as nodata_frac_AHN3,
-		"processfeatures.ogrloader.nodata_frac_ahn4" as nodata_frac_AHN4,
-		"processfeatures.ogrloader.nodata_r_ahn3" as nodata_r_AHN3,
-		"processfeatures.ogrloader.nodata_r_ahn4" as nodata_r_AHN4,
-		"processfeatures.ogrloader.oorspronkelijkbouwjaar" as oorspronkelijkbouwjaar,
-		"processfeatures.ogrloader.pc_select" as pc_select,
-		"processfeatures.ogrloader.pc_source" as pc_source,
-		"processfeatures.ogrloader.pt_density_ahn3" as pt_density_AHN3,
-		"processfeatures.ogrloader.pt_density_ahn4" as pt_density_AHN4,
-		"processfeatures.area_m" as area_m,
-		"processfeatures.h_dak_max" as h_dak_max,
-		"processfeatures.h_dak_min" as h_dak_min,
-		"processfeatures.h_maaiveld" as h_maaiveld,
-		"processfeatures.identificatie" as identificatie,
-		"processfeatures.rmse_lod12" as rmse_lod12,
-		"processfeatures.rmse_lod13" as rmse_lod13,
-		"processfeatures.rmse_lod22" as rmse_lod22,
-		"processfeatures.val3dity_codes_lod22" as val3dity_codes_lod22,
-		"processfeatures.volume_lod12" as volume_lod12,
-		"processfeatures.volume_lod13" as volume_lod13,
-		"processfeatures.volume_lod22" as volume_lod22
+    "identificatie", 
+		"status", 
+		"oorspronkelijkbouwjaar", 
+		"b3_h_maaiveld", 
+		"b3_volume_lod12",
+		"b3_volume_lod13", 
+		"b3_volume_lod22", 
+		"b3_dak_type", 
+		"b3_pw_datum", 
+		"b3_pw_bron", 
+		"b3_kas_warenhuis", 
+		"b3_reconstructie_onvolledig", 
+		"b3_val3dity_lod12",
+		"b3_val3dity_lod13", 
+		"b3_val3dity_lod22",
+		"b3_rmse_lod12",
+		"b3_rmse_lod13",
+		"b3_rmse_lod22",
+		"b3_mutatie_ahn3_ahn4",
+		"b3_nodata_fractie_ahn3", 
+		"b3_nodata_fractie_ahn4", 
+		"b3_nodata_radius_ahn3", 
+		"b3_nodata_radius_ahn4", 
+		"b3_pw_selectie_reden", 
+		"b3_puntdichtheid_ahn3", 
+		"b3_puntdichtheid_ahn4"
     ) d))::text;
 
-UPDATE tiles.gpkg_files SET geom = ST_Translate(geom, 0, 0, "processfeatures.h_maaiveld" * -1.0); 
+UPDATE tiles.gpkg_files SET geom = ST_Translate(geom, 0, 0, "b3_h_maaiveld" * -1.0); 
 ```
 
 ## Create the 3D tiles.

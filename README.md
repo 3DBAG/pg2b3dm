@@ -51,17 +51,19 @@ find -L /path/to/gpkg/files/ -path "/path/to/gpkg/files/*tri.gpkg" > all_gpkg.tx
 Import files into tiles.gpkg_files table in the baseregisters schema (on gilfoyle):
 
 ```bash
+export PG_USE_COPY=TRUE
  while read f; do
    base_name=$(basename ${f})
    echo ${base_name}
    names=($(echo ${base_name} | sed s/-/\\n/g))
    id=${names[0]}/${names[1]}/${names[2]}
    lod=${names[3]: -2}
-    ogr2ogr -update -append  -f "PostgreSQL" PG:"host=localhost user=<USERNAME> dbname=baseregisters password=<PASSWORD>" $f -nlt MULTIPOLYGON25D -nln tiles.gpkg_files -sql """SELECT '$base_name' AS filename, ${names[0]} AS level,  '$id' AS tile_id, ${lod} AS lod, * FROM geom"""
+    ogr2ogr -update -append  -f "PostgreSQL" PG:"host=localhost user=<USERNAME> dbname=baseregisters password=<PASSWORD>" $f -nlt MULTIPOLYGON25D -nln tiles.gpkg_files -sql """SELECT '$base_name' AS filename, ${names[0]} AS level,  '$id' AS tile_id, ${lod} AS lod, * FROM geom""" -gt 65536 -lco SPATIAL_INDEX=NO
+
 done < all_gpkg.txt
 ```
 
-After importing you need to create the attributes column and also correct the Z dimension of geometries by subtracting the ground height:
+After importing you need to  1) create the attributes column, 2) correct the Z dimension of geometries by subtracting the ground height, 3) create the indexes and 4) delete features with dimensions with edge values.
 
 ```SQL
 ALTER TABLE tiles.gpkg_files ADD COLUMN attributes text;
@@ -69,7 +71,7 @@ UPDATE tiles.gpkg_files SET attributes  = ROW_TO_JSON(
 (SELECT d
   FROM (
     SELECT 
-    "identificatie", 
+        "identificatie", 
 		"status", 
 		"oorspronkelijkbouwjaar", 
 		"b3_h_maaiveld", 
@@ -98,6 +100,19 @@ UPDATE tiles.gpkg_files SET attributes  = ROW_TO_JSON(
     ) d))::text;
 
 UPDATE tiles.gpkg_files SET geom = ST_Translate(geom, 0, 0, "b3_h_maaiveld" * -1.0); 
+
+CREATE INDEX IF NOT EXISTS gpkg_files_tile_id_idx
+ON tiles.gpkg_files
+USING btree(tile_id);
+           
+CREATE INDEX IF NOT EXISTS gpkg_files_geom_idx
+ON tiles.gpkg_files 
+USING gist(geom); 
+
+DELETE FROM tiles.gpkg_files a 
+WHERE (st_xmax(a.geom) - st_xmin(a.geom)) > 1500
+  AND (st_ymax(a.geom) - st_ymin(a.geom)) > 1500
+  AND (st_zmax(a.geom) - st_zmin(a.geom)) > 1500;
 ```
 
 ## Create the 3D tiles.

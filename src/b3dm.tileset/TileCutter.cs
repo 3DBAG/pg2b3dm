@@ -64,7 +64,6 @@ namespace B3dm.Tileset
                                                 SELECT {tileIdColumn} as tile_id, ST_3DExtent({geometryColumn}) as bbox 
                                                 FROM {geometryTable}  
                                                 WHERE {lodcolumn} = {currentLod}
-                                                AND {tileIdColumn} in ('9/328/504', '9/328/508', '9/332/504', '9/332/508' )
                                                 GROUP BY {tileIdColumn}
                                             ) as bbox 
                                         ) as b

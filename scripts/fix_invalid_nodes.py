@@ -33,7 +33,10 @@ def isInvalid(boundingVolume):
   y = boundingVolume["box"][1]
   z = boundingVolume["box"][2]
   t = 1e6
-  for v in boundingVolume["box"]:
+  for v in boundingVolume["box"][:3]:
+    if v > t: return True
+  t = 5e3
+  for v in boundingVolume["box"][3:]:
     if v > t: return True
 
 def remove_invalid_leafs(node):
@@ -97,10 +100,10 @@ def compute_bounding_volume(node):
   
   aabb = get_aabb( node["children"][0]["boundingVolume"] )
   for child in node["children"][1:]:
-    merge_aabb( aabb, get_aabb(child["boundingVolume"]) )
+    aabb = merge_aabb( aabb, get_aabb(child["boundingVolume"]) )
 
   node["boundingVolume"]["box"] = set_from_aabb(aabb)
-  print(node["boundingVolume"]["box"])
+  # print(node["boundingVolume"]["box"])
 
 
 def recompute_bounding_volumes(node):
@@ -112,11 +115,60 @@ def recompute_bounding_volumes(node):
       recompute_bounding_volumes(child)
     compute_bounding_volume(node)
 
+def apply_offsets(node, ox, oy, oz):
+  box = list(node["boundingVolume"]["box"])
+  box[0] = float(box[0]) - ox
+  box[1] = float(box[1]) - oy
+  box[2] = float(box[2]) - oz
+  node["boundingVolume"]["box"] = box
+  if node.get("content"):
+    return node
+  elif node.get("children"):
+    # new_children = []
+    for child in node["children"]:
+      apply_offsets(child, ox, oy, oz)
+
+def tileset_to_wkt(root_node, filename):
+  tx, ty = root_node["transform"][-4:-2]
+
+  def addl(l, node):
+    b = get_aabb(node["boundingVolume"])
+    l.append( f"POLYGON(( {b[0]+tx} {b[2]+ty}, {b[1]+tx} {b[2]+ty}, {b[1]+tx} {b[3]+ty}, {b[0]+tx} {b[3]+ty}, {b[0]+tx} {b[2]+ty} ));{bool(node.get('content'))}" )
+    if node.get("content"):
+      return node
+    elif node.get("children"):
+      for child in node["children"]:
+        addl(l, child)
+  
+  wktlist = []
+  addl(wktlist, root_node)
+  with open(filename, "w") as file:
+    for wkt in wktlist:
+      file.write(f"{wkt}\n")
+  
+
 with open(filename, "r") as in_file:
     tileset = json.load(in_file)
 
-remove_invalid_leafs(tileset["root"])
-recompute_bounding_volumes(tileset["root"])
+root = tileset["root"]
+tileset_to_wkt(root, "wktdump_og.csv")
+
+remove_invalid_leafs(root)
+recompute_bounding_volumes(root)
+
+# fix offset that appears in viewer.
+box = list(root["boundingVolume"]["box"])
+ox = float(box[0])
+oy = float(box[1])
+oz = float(box[2])
+# apply_offsets(root, ox, oy, oz)
+transform = list(root["transform"])
+transform[12] += ox
+transform[13] += oy
+transform[14] += oz
+root["transform"] = transform
+
+tileset_to_wkt(root, "wktdump.csv")
 
 with open(output, "w") as file:
     json.dump(tileset, file)

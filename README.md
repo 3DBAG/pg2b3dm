@@ -111,8 +111,8 @@ USING gist(geom);
 
 DELETE FROM tiles.gpkg_files a 
 WHERE (st_xmax(a.geom) - st_xmin(a.geom)) > 1500
-  AND (st_ymax(a.geom) - st_ymin(a.geom)) > 1500
-  AND (st_zmax(a.geom) - st_zmin(a.geom)) > 1500;
+  OR (st_ymax(a.geom) - st_ymin(a.geom)) > 1500
+  OR (st_zmax(a.geom) - st_zmin(a.geom)) > 1500;
 ```
 
 ## Create the 3D tiles.

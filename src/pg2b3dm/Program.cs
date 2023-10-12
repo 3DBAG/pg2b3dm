@@ -292,7 +292,7 @@ namespace pg2b3dm
                 var filename = $"{outputPath}/tiles/{t.Id.Replace('/', '-')}.b3dm" + compressionExtension;
                 if (SkipTiles && File.Exists(filename))
                 {
-                    Console.WriteLine("File Exists. Skipping");
+                    Console.WriteLine($"File {filename} Exists. Skipping");
                     return new_conn;
                 }
 
@@ -307,7 +307,7 @@ namespace pg2b3dm
                 }
 
                 var attributes = GetAttributes(geometries);
-                Console.WriteLine("Got attributes!");
+                
 
                 var bytes =  new byte[0];
                 try {
@@ -320,6 +320,7 @@ namespace pg2b3dm
                     skippedTiles.Add(t.Id.ToString());
                     return new_conn;
                 }
+                Console.WriteLine("b3dm created!");
 
 
                 if (compressionType == "")
@@ -340,6 +341,7 @@ namespace pg2b3dm
                 if (t.Children != null) {
                     counter = WriteTiles(connectionString, geometryTable, geometryColumn, idcolumn, translation, t.Children, epsg, outputPath, counter, maxcount, skipHugeTiles, colorColumn, attributesColumn, lodColumn, SkipTiles, MaxThreads, compressionType, DisablePb);
                 }
+                Console.WriteLine($"Written {t.Id.ToString()}");
 
                 return new_conn;
             },

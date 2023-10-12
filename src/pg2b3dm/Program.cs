@@ -282,7 +282,7 @@ namespace pg2b3dm
                     if (!DisablePb) {
                         pb.Refresh(counter, $"{counter}/{maxcount} - {perc:F}%");
                     } else {
-                        Console.WriteLine($"\rcreating tiles: {counter}/{maxcount} - {perc:F}%");
+                        Console.WriteLine($"\rcreating tiles: {counter}/{maxcount} - {perc:F}% >>> Tile: {t.Id.ToString()}");
                     }
                 }
 
@@ -292,6 +292,7 @@ namespace pg2b3dm
                 var filename = $"{outputPath}/tiles/{t.Id.Replace('/', '-')}.b3dm" + compressionExtension;
                 if (SkipTiles && File.Exists(filename))
                 {
+                    Console.WriteLine("File Exists. Skipping");
                     return new_conn;
                 }
 
@@ -306,6 +307,7 @@ namespace pg2b3dm
                 }
 
                 var attributes = GetAttributes(geometries);
+                Console.WriteLine("Got attributes!");
 
                 var bytes =  new byte[0];
                 try {

@@ -1,12 +1,8 @@
 # pg2b3dm
 
-![.NET Core](https://github.com/Geodan/pg2b3dm/workflows/.NET%20Core/badge.svg)
 
-Tool for converting from PostGIS to [3D Tiles](https://github.com/AnalyticalGraphicsInc/3d-tiles)/b3dm tiles. This software started as a port of [py3dtiles](https://github.com/Oslandia/py3dtiles) for generating b3dm tiles.
+This tool has originally been forked from [Geodan/pg2b3dm](https://github.com/Geodan/pg2b3dm) but has been modified in order to accommodate the needs of the 3DBAG pipeline. The modifications include multithreading, the use of a custom quadtree (stored in a database) and gzip compression. It is being used for the generation of 3D tiles for the 3DBAG.
 
-![mokum](https://user-images.githubusercontent.com/538812/63088752-24fa8000-bf56-11e9-9ba8-3273a21dfda0.png)
-
-This tool has been forked from [Geodan/pg2b3dm](https://github.com/Geodan/pg2b3dm) and has been modified in order to accommodate the needs of the 3DBAG pipeline. The modifications include multithreading, the use of a custom quadtree (stored in a database) and gzip compression.
 
  Prerequisite: [.NET 6.0 SDK](https://dotnet.microsoft.com/download/dotnet/6.0) should be installed installed
 

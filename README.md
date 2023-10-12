@@ -12,7 +12,7 @@ This tool has been forked from [Geodan/pg2b3dm](https://github.com/Geodan/pg2b3d
 
  ## How to create the Quadtree table:
 
- Assuming that the quadtree is available in .tsv format first create the table in the DB:
+ Assuming that the quadtree is available in .tsv format (usually in /data/3DBAG/export/  on gilfoyle) first create the table in the baseregisters DB on Gilfoyle:
 
  ```SQL
  -- DROP TABLE tiles.quadtree;

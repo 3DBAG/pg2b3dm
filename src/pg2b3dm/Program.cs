@@ -320,8 +320,6 @@ namespace pg2b3dm
                     skippedTiles.Add(t.Id.ToString());
                     return new_conn;
                 }
-                Console.WriteLine("b3dm created!");
-
 
                 if (compressionType == "")
                 {
@@ -341,7 +339,6 @@ namespace pg2b3dm
                 if (t.Children != null) {
                     counter = WriteTiles(connectionString, geometryTable, geometryColumn, idcolumn, translation, t.Children, epsg, outputPath, counter, maxcount, skipHugeTiles, colorColumn, attributesColumn, lodColumn, SkipTiles, MaxThreads, compressionType, DisablePb);
                 }
-                Console.WriteLine($"Written {t.Id.ToString()}");
 
                 return new_conn;
             },

@@ -59,7 +59,7 @@ export PG_USE_COPY=TRUE
 done < all_gpkg.txt
 ```
 
-After importing you need to  1) create the attributes column, 2) correct the Z dimension of geometries by subtracting the ground height, 3) create the indexes and 4) delete features with dimensions with edge values.
+After importing you need to  1) create the attributes column (make sure you include and new attributes), 2) correct the Z dimension of geometries by subtracting the ground height, 3) create the indexes and 4) delete features with dimensions with edge values.
 
 ```SQL
 ALTER TABLE tiles.gpkg_files ADD COLUMN attributes text;
@@ -67,7 +67,7 @@ UPDATE tiles.gpkg_files SET attributes  = ROW_TO_JSON(
 (SELECT d
   FROM (
     SELECT 
-        "identificatie", 
+    "identificatie", 
 		"status", 
 		"oorspronkelijkbouwjaar", 
 		"b3_h_maaiveld", 
@@ -92,7 +92,12 @@ UPDATE tiles.gpkg_files SET attributes  = ROW_TO_JSON(
 		"b3_nodata_radius_ahn4", 
 		"b3_pw_selectie_reden", 
 		"b3_puntdichtheid_ahn3", 
-		"b3_puntdichtheid_ahn4"
+		"b3_puntdichtheid_ahn4",
+    "b3_opp_buitenmuur",
+		"b3_opp_dak_plat",
+		"b3_opp_dak_schuin"
+		"b3_opp_grond",
+		"b3_opp_scheidingsmuur"
     ) d))::text;
 
 UPDATE tiles.gpkg_files SET geom = ST_Translate(geom, 0, 0, "b3_h_maaiveld" * -1.0); 

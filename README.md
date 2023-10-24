@@ -133,7 +133,7 @@ Then you can build from within the root of the repo with:
 And then run the command (make sure you have a .pgpass file with the credentials for the gilfoyle DB):
 
 ```bash
-dotnet run -- -U <USER_NAME> -p 5435 --dbname baseregisters -t 'tiles.gpkg_files' -c 'geom' -i 'ogc_fid' --qttable tiles.quadtree --tileidcolumn tile_id --lodcolumn lod --attributescolumn attributes --skiptilesntriangles 3500000 --passfile ~/.pgpass --maxthreads 30 --compression gzip --disableprogressbar -o /data/3DBAGv2/export/3dtiles/v2306_test  --skiptiles
+dotnet run -- -U <USER_NAME> -p 5435 --dbname baseregisters -t 'tiles.gpkg_files' -c 'geom' -i 'ogc_fid' --qttable tiles.quadtree --tileidcolumn tile_id --lodcolumn lod --attributescolumn attributes --skiptilesntriangles 3500000 --passfile ~/.pgpass --maxthreads 30 --compression gzip --disableprogressbar -o /data/3DBAGv3/export_v2023.10.08/3dtiles/  --skiptiles
  ```
 
 ## Command line options

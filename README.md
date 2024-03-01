@@ -41,7 +41,7 @@ USING ST_GeomFromText(geom, 28992);
 
 Find the paths to files (on gilfoyle)
 ```bash
-find -L /path/to/gpkg/files/ -path "/path/to/gpkg/files/*tri.gpkg" > all_gpkg.txt
+find -L /data/3DBAG/export/tiles/ -path "/data/3DBAG/export/tiles/*tri.gpkg" > all_gpkg.txt
 ```
 
 Import files into tiles.gpkg_files table in the baseregisters schema (on gilfoyle):
@@ -93,11 +93,13 @@ UPDATE tiles.gpkg_files SET attributes  = ROW_TO_JSON(
 		"b3_pw_selectie_reden", 
 		"b3_puntdichtheid_ahn3", 
 		"b3_puntdichtheid_ahn4",
-    "b3_opp_buitenmuur",
+    	"b3_opp_buitenmuur",
 		"b3_opp_dak_plat",
-		"b3_opp_dak_schuin"
+		"b3_opp_dak_schuin",
 		"b3_opp_grond",
-		"b3_opp_scheidingsmuur"
+		"b3_opp_scheidingsmuur",
+    	"b3_bouwlagen",
+	  	"b3_kwaliteitsindicator"
     ) d))::text;
 
 UPDATE tiles.gpkg_files SET geom = ST_Translate(geom, 0, 0, "b3_h_maaiveld" * -1.0); 

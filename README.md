@@ -8,7 +8,7 @@ This tool has originally been forked from [Geodan/pg2b3dm](https://github.com/Ge
 
  ## How to create the Quadtree table:
 
- Assuming that the quadtree is available in .tsv format (usually in /data/3DBAG/export/  on gilfoyle) first create the table in the baseregisters DB on Gilfoyle:
+ Assuming that the quadtree is available in .tsv format (usually in /data/3DBAG/export/ on gilfoyle) first create the table in the `baseregisters` DB (drop it if it already exists):
 
  ```SQL
  -- DROP TABLE tiles.quadtree;
@@ -21,10 +21,10 @@ CREATE TABLE tiles.quadtree(
 CONSTRAINT id PRIMARY KEY (id));
 ```
 
-Then import the file with:
+You can import the file by connecting to the `baseregisters` database from Gilfoyle and running:
 ```SQL
 \COPY tiles.quadtree 
-FROM '/path/to/quadtree/quadtree.tsv'
+FROM '/data/3DBAG/export/quadtree.tsv'
 DELIMITER E'\t'
 CSV HEADER;
 ```
@@ -39,12 +39,13 @@ USING ST_GeomFromText(geom, 28992);
 
 ##  How to create the gpkg table:
 
-Find the paths to files (on gilfoyle)
+On Gilfoyle, gather the paths of the triangulated gpkg files in a single file:
+
 ```bash
 find -L /data/3DBAG/export/tiles/ -path "/data/3DBAG/export/tiles/*tri.gpkg" > all_gpkg.txt
 ```
 
-Import files into tiles.gpkg_files table in the baseregisters schema (on gilfoyle):
+In the `baseregisters` database first drop the old `tiles.gpkg_files` table and then import the .gpkg files:
 
 ```bash
 export PG_USE_COPY=TRUE
@@ -55,11 +56,10 @@ export PG_USE_COPY=TRUE
    id=${names[0]}/${names[1]}/${names[2]}
    lod=${names[3]: -2}
     ogr2ogr -update -append  -f "PostgreSQL" PG:"host=localhost user=<USERNAME> dbname=baseregisters password=<PASSWORD>" $f -nlt MULTIPOLYGON25D -nln tiles.gpkg_files -sql """SELECT '$base_name' AS filename, ${names[0]} AS level,  '$id' AS tile_id, ${lod} AS lod, * FROM geom""" -gt 65536 -lco SPATIAL_INDEX=NO
-
 done < all_gpkg.txt
 ```
 
-After importing you need to  1) create the attributes column (make sure you include and new attributes), 2) correct the Z dimension of geometries by subtracting the ground height, 3) create the indexes and 4) delete features with dimensions with edge values.
+After importing you need to  1) create the attributes column (**make sure you include any new attributes**), 2) correct the Z dimension of geometries by subtracting the ground height, 3) create the indexes and 4) delete features with dimensions with edge values.
 
 ```SQL
 ALTER TABLE tiles.gpkg_files ADD COLUMN attributes text;
@@ -93,13 +93,13 @@ UPDATE tiles.gpkg_files SET attributes  = ROW_TO_JSON(
 		"b3_pw_selectie_reden", 
 		"b3_puntdichtheid_ahn3", 
 		"b3_puntdichtheid_ahn4",
-    	"b3_opp_buitenmuur",
+		"b3_opp_buitenmuur",
 		"b3_opp_dak_plat",
 		"b3_opp_dak_schuin",
 		"b3_opp_grond",
 		"b3_opp_scheidingsmuur",
-    	"b3_bouwlagen",
-	  	"b3_kwaliteitsindicator"
+		"b3_bouwlagen",
+		"b3_kwaliteitsindicator"
     ) d))::text;
 
 UPDATE tiles.gpkg_files SET geom = ST_Translate(geom, 0, 0, "b3_h_maaiveld" * -1.0); 
@@ -118,9 +118,22 @@ WHERE (st_xmax(a.geom) - st_xmin(a.geom)) > 1500
   OR (st_zmax(a.geom) - st_zmin(a.geom)) > 1500;
 ```
 
+## Greenhouses (Optional)
+This step is performed until we have another mechanism in place which detects and rejects greenhouses before the reconstruction.
+Greenhouses or other problematic cases which are characterised by glass roofs can be identified with the excessive number of building parts within a single building. 
+
+First I identiy the buildings with > 10000 building parts (can also be 5000). Then I store them in a separate table `tiles.gpkg_files_only_greenhouses` and I  drop the same buildings from the `tiles.gpkg_files` table. 
+
+```
+select identificatie  
+from  tiles.gpkg_files 
+group by identificatie  
+HAVING count(*) > 10000;
+```
+
 ## Create the 3D tiles.
 
-Then after cloning the repo on godzilla, you need to activate a tunnel to gilfoyle:
+After cloning the pg2b3dm repo on godzilla, you need to activate a tunnel to gilfoyle:
 
 ```bash
 ssh -f -N -M -S /tmp/gilfoyle_postgres -L 5435:localhost:5432 gilfoyle
@@ -132,7 +145,7 @@ Then you can build from within the root of the repo with:
   dotnet build
 ```
 
-And then run the command (make sure you have a .pgpass file with the credentials for the gilfoyle DB):
+And then run this command to create the tiles (make sure you have a .pgpass file with the credentials for the gilfoyle DB):
 
 ```bash
 dotnet run -- -U <USER_NAME> -p 5435 --dbname baseregisters -t 'tiles.gpkg_files' -c 'geom' -i 'ogc_fid' --qttable tiles.quadtree --tileidcolumn tile_id --lodcolumn lod --attributescolumn attributes --skiptilesntriangles 3500000 --passfile ~/.pgpass --maxthreads 30 --compression gzip --disableprogressbar -o /data/3DBAGv3/export_v2023.10.08/3dtiles/  --skiptiles
@@ -197,48 +210,3 @@ If --username and/or --dbname are not specified the current username is used as 
 
   --version             Display version information.  
 ```
-
-## Remarks
-
-## Geometries
-
-- All geometries must be type polyhedralsurface consisting of triangles with 4 vertices each. If not 4 vertices exception is thrown.
-
-### Colors
-
-- Colors must be specified as hex colors, like '#ff5555';
-
-- If no color column is specified, a default color (#bb3333) is used for all buildings;
-
-- If color column is specified and database type is 'text', 1 color per building is used;
-
-- If color column is specified and database type is 'text[]', 1 color per triangle is used. Exception is thrown when number
-
-of colors doesn't equal the number of triangles in geometry. Order of colors must be equal to order of triangles.
-
-- Transparency (alpha channel) can be used, possible values:
-
-100% — FF 95% — F2 90% — E6 85% — D9 80% — CC 75% — BF 70% — B3 65% — A6 60% — 99 55% — 8C 50% — 80 45% — 73 40% — 66 35% — 59 30% — 4D 25% — 40 20% — 33 15% — 26 10% — 1A 5% — 0D 0% — 00
-
-100% means opaque, 0% means transparent
-
-Id column rules:
-
-- Id column must be type string;
-
-- Id column should be indexed for better performance.
-
-## LOD
-
-- if there are no features within a tile boundingbox, the tile (including children) will not be generated. 
-
-## Geometric errors
-
-- By default, as geometric errors [500,0] are used (for 1 LOD). When there multiple LOD's, there should be number_of_lod + 1 geometric errors specified in the -g option. When using multiple LOD and the -g option is not specified, the geometric errors are calculated using equal intervals between 500 and 0.
-
-## Getting started
-
-See [getting started](getting_started.md) for a tutorial how to run an order version of Geodan/pg2b3dm and visualize buildings in Cesium.
-
-For a dataprocessing workflow from CityGML to 3D Tiles using GDAL, PostGIS and FME see [dataprocessing/dataprocessing_citygml](dataprocessing/dataprocessing_citygml.md).
-

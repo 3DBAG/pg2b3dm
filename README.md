@@ -80,7 +80,6 @@ UPDATE tiles.gpkg_files SET attributes  = ROW_TO_JSON(
 		"b3_pw_onvoldoende",
 		"b3_pw_selectie_reden", 
 		"b3_kas_warenhuis", 
-		"b3_reconstructie_onvolledig", 
 		"b3_val3dity_lod12",
 		"b3_val3dity_lod13", 
 		"b3_val3dity_lod22",

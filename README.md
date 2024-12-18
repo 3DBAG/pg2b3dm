@@ -66,8 +66,8 @@ ALTER TABLE tiles.gpkg_files ADD COLUMN attributes text;
 UPDATE tiles.gpkg_files SET attributes  = ROW_TO_JSON(
 (SELECT d
   FROM (
-    SELECT 
-    "identificatie", 
+		SELECT 
+		"identificatie", 
 		"status", 
 		"oorspronkelijkbouwjaar", 
 		"b3_h_maaiveld", 
@@ -77,8 +77,8 @@ UPDATE tiles.gpkg_files SET attributes  = ROW_TO_JSON(
 		"b3_dak_type", 
 		"b3_pw_datum", 
 		"b3_pw_bron",
-    "b3_pw_onvoldoende",
-    "b3_pw_selectie_reden", 
+		"b3_pw_onvoldoende",
+		"b3_pw_selectie_reden", 
 		"b3_kas_warenhuis", 
 		"b3_reconstructie_onvolledig", 
 		"b3_val3dity_lod12",
@@ -88,16 +88,16 @@ UPDATE tiles.gpkg_files SET attributes  = ROW_TO_JSON(
 		"b3_rmse_lod13",
 		"b3_rmse_lod22",
 		"b3_mutatie_ahn3_ahn4",
-    "b3_mutatie_ahn4_ahn5",
-		"b3_nodata_fractie_ahn3", 
-		"b3_nodata_fractie_ahn4", 
-    "b3_nodata_fractie_ahn5", 
-		"b3_nodata_radius_ahn3", 
+		"b3_mutatie_ahn4_ahn5",
+		"b3_nodata_fractie_ahn3",
+		"b3_nodata_fractie_ahn4",
+		"b3_nodata_fractie_ahn5",
+		"b3_nodata_radius_ahn3",
 		"b3_nodata_radius_ahn4",
-    "b3_nodata_radius_ahn5", 
-		"b3_puntdichtheid_ahn3", 
+		"b3_nodata_radius_ahn5",
+		"b3_puntdichtheid_ahn3",
 		"b3_puntdichtheid_ahn4",
-    "b3_puntdichtheid_ahn5",
+		"b3_puntdichtheid_ahn5",
 		"b3_opp_buitenmuur",
 		"b3_opp_dak_plat",
 		"b3_opp_dak_schuin",
@@ -105,12 +105,12 @@ UPDATE tiles.gpkg_files SET attributes  = ROW_TO_JSON(
 		"b3_opp_scheidingsmuur",
 		"b3_bouwlagen",
 		"b3_kwaliteitsindicator",
-    "b3_extrusie",
-    "b3_is_glas_dak",
-    "b3_n_vlakken",
-    "b3_succes",
-    "b3_t_run",
-    ) d))::text;
+		"b3_extrusie",
+		"b3_is_glas_dak",
+		"b3_n_vlakken",
+		"b3_succes",
+		"b3_t_run",
+		) d))::text;
 
 UPDATE tiles.gpkg_files SET geom = ST_Translate(geom, 0, 0, "b3_h_maaiveld" * -1.0); 
 

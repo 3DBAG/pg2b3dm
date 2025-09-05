@@ -8,7 +8,7 @@ This tool has originally been forked from [Geodan/pg2b3dm](https://github.com/Ge
 
  ## How to create the Quadtree table:
 
- Assuming that the quadtree is available in .tsv format (usually in /data/3DBAG/export/ on gilfoyle) first create the table in the `baseregisters` DB (drop it if it already exists):
+ Assuming that the quadtree is available in .tsv format (usually in /data/3DBAG/export_<release_version>/ on gilfoyle) first create the table in the `baseregisters` DB (drop it if it already exists):
 
  ```SQL
  -- DROP TABLE tiles.quadtree;
@@ -24,7 +24,7 @@ CONSTRAINT id PRIMARY KEY (id));
 You can import the file by connecting to the `baseregisters` database from Gilfoyle and running:
 ```SQL
 \COPY tiles.quadtree 
-FROM '/data/3DBAG/export/quadtree.tsv'
+FROM '/data/3DBAG/export_<release_version>/quadtree.tsv'
 DELIMITER E'\t'
 CSV HEADER;
 ```
@@ -42,7 +42,7 @@ USING ST_GeomFromText(geom, 28992);
 On Gilfoyle, gather the paths of the triangulated gpkg files in a single file:
 
 ```bash
-find -L /data/3DBAG/export/tiles/ -path "/data/3DBAG/export/tiles/*tri.gpkg" > all_gpkg.txt
+find -L /data/3DBAG/export_<release_version>/tiles/ -path "/data/3DBAG/export_<release_version>/tiles/*tri.gpkg" > all_gpkg.txt
 ```
 
 In the `baseregisters` database first drop the old `tiles.gpkg_files` table and then import the .gpkg files:
@@ -107,8 +107,9 @@ UPDATE tiles.gpkg_files SET attributes  = ROW_TO_JSON(
 		"b3_extrusie",
 		"b3_is_glas_dak",
 		"b3_n_vlakken",
-		"b3_succes",
-		"b3_t_run",
+		"b3_h_nok",
+		"b3_n_nok",
+		"b3_t_run"
 		) d))::text;
 
 UPDATE tiles.gpkg_files SET geom = ST_Translate(geom, 0, 0, "b3_h_maaiveld" * -1.0); 
@@ -131,13 +132,14 @@ WHERE (st_xmax(a.geom) - st_xmin(a.geom)) > 1500
 This step is performed until we have another mechanism in place which detects and rejects greenhouses before the reconstruction.
 Greenhouses or other problematic cases which are characterised by glass roofs can be identified with the excessive number of building parts within a single building. 
 
-First I identiy the buildings with > 10000 building parts (can also be 5000). Then I store them in a separate table `tiles.gpkg_files_only_greenhouses` and I  drop the same buildings from the `tiles.gpkg_files` table. 
+First we identify the buildings with > 10000 building parts (can also be 5000). Then we store them in a separate table `tiles.gpkg_files_only_greenhouses` and I  drop the same buildings from the `tiles.gpkg_files` table. 
 
-```
-select identificatie  
-from  tiles.gpkg_files 
-group by identificatie  
-HAVING count(*) > 10000;
+```SQL
+CREATE TABLE tiles.gpkg_files_only_greenhouses AS
+SELECT identificatie  
+FROM  tiles.gpkg_files 
+GROUP BY identificatie  
+HAVING COUNT(*) > 10000;
 ```
 
 ## Create the 3D tiles.
@@ -148,16 +150,24 @@ After cloning the pg2b3dm repo on godzilla, you need to activate a tunnel to gil
 ssh -f -N -M -S /tmp/gilfoyle_postgres -L 5435:localhost:5432 gilfoyle
 ```
 
+If you do not have .NET SDK 6.0 installed you can use the following to open a shell that has it:
+
+```bash
+export NIXPKGS_ALLOW_INSECURE=1
+nix-shell -p dotnet-sdk_6
+```
+
 Then you can build from within the root of the repo with:
 ```bash
   cd pg2b3dm/src/pg2b3dm
   dotnet build
 ```
 
-And then run this command to create the tiles (make sure you have a .pgpass file with the credentials for the gilfoyle DB):
+Create the directory `/data/3DBAG/<release_version>/3dtiles/` and the lod subdirectories.
+Then run this command to create the tiles (make sure you have a .pgpass file with the credentials for the gilfoyle DB):
 
 ```bash
-dotnet run -- -U <USER_NAME> -p 5435 --dbname baseregisters -t 'tiles.gpkg_files' -c 'geom' -i 'ogc_fid' --qttable tiles.quadtree --tileidcolumn tile_id --lodcolumn lod --attributescolumn attributes --skiptilesntriangles 3500000 --passfile ~/.pgpass --maxthreads 30 --compression gzip --disableprogressbar -o /data/3DBAGv3/export_v2023.10.08/3dtiles/  --skiptiles
+dotnet run -- -U <USER_NAME> -p 5435 --dbname baseregisters -t 'tiles.gpkg_files' -c 'geom' -i 'ogc_fid' --qttable tiles.quadtree --tileidcolumn tile_id --lodcolumn lod --attributescolumn attributes --skiptilesntriangles 3500000 --passfile ~/.pgpass --maxthreads 30 --compression gzip --disableprogressbar -o /data/3DBAG/<release_version>/3dtiles/  --skiptiles
  ```
 
 ## Command line options
